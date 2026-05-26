@@ -4,17 +4,26 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, 
 
 const ACCENT = "#F97316";
 
-function themeVars(dark) {
-  return dark ? `
+const LIGHT_PALETTES = {
+  krem:     { bg: "#F0ECE4", surface: "#FAF7F2", surface2: "#E8E3DA", border: "#DDD8CF", border2: "#C8C3BA" },
+  skifer:   { bg: "#E4E9EF", surface: "#F0F4F8", surface2: "#D8DFE8", border: "#C4CDD8", border2: "#AEBBC8" },
+  salvie:   { bg: "#E4EDE6", surface: "#F0F6F1", surface2: "#D4E2D8", border: "#BCCFC2", border2: "#A4BCAC" },
+  lavendel: { bg: "#EAE6F0", surface: "#F4F1F8", surface2: "#DDD8E8", border: "#C8C0D8", border2: "#B0A8C8" },
+};
+
+function themeVars(dark, palette = "krem") {
+  if (dark) return `
     :root {
       --bg: #0A0A0A; --surface: #141414; --surface2: #1a1a1a;
       --border: #222; --border2: #333;
       --text: #F5F5F0; --muted: #666; --muted2: #444;
     }
-  ` : `
+  `;
+  const p = LIGHT_PALETTES[palette] || LIGHT_PALETTES.krem;
+  return `
     :root {
-      --bg: #F0ECE4; --surface: #FAF7F2; --surface2: #E8E3DA;
-      --border: #DDD8CF; --border2: #C8C3BA;
+      --bg: ${p.bg}; --surface: ${p.surface}; --surface2: ${p.surface2};
+      --border: ${p.border}; --border2: ${p.border2};
       --text: #111111; --muted: #888; --muted2: #AAAAAA;
     }
   `;
@@ -324,6 +333,12 @@ function AuthScreen() {
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("ironlog-theme") !== "light");
+  const [lightPalette, setLightPalette] = useState(() => localStorage.getItem("ironlog-palette") || "krem");
+
+  function setPalette(p) {
+    setLightPalette(p);
+    localStorage.setItem("ironlog-palette", p);
+  }
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState("dashboard");
@@ -535,7 +550,7 @@ export default function App() {
   if (authLoading) {
     return (
       <>
-        <style>{themeVars(darkMode) + styles}</style>
+        <style>{themeVars(darkMode, lightPalette) + styles}</style>
         <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{fontFamily:"'DM Mono',monospace",fontSize:".8rem",color:"var(--muted)",letterSpacing:"2px"}}>LASTER...</div>
         </div>
@@ -546,7 +561,7 @@ export default function App() {
   if (!user) {
     return (
       <>
-        <style>{themeVars(darkMode) + styles}</style>
+        <style>{themeVars(darkMode, lightPalette) + styles}</style>
         <AuthScreen />
       </>
     );
@@ -554,13 +569,19 @@ export default function App() {
 
   return (
     <>
-      <style>{themeVars(darkMode) + styles}</style>
+      <style>{themeVars(darkMode, lightPalette) + styles}</style>
       <div className="tracker">
         <div className="header">
           <h1>IRON<span style={{color:ACCENT}}>LOG</span></h1>
           <span className="header-date">{todayKey()}</span>
           <div className="header-dot" />
-          <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"10px"}}>
+          <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"8px"}}>
+            {!darkMode && Object.entries({krem:"#F0ECE4", skifer:"#E4E9EF", salvie:"#E4EDE6", lavendel:"#EAE6F0"}).map(([name, color]) => (
+              <button key={name} onClick={() => setPalette(name)} title={name} style={{
+                width:"18px", height:"18px", borderRadius:"50%", background:color, border: lightPalette===name ? "2px solid #F97316" : "2px solid transparent",
+                cursor:"pointer", padding:0, flexShrink:0
+              }} />
+            ))}
             <button className="btn-theme" onClick={toggleTheme}>{darkMode ? "☀" : "🌙"}</button>
             <span className="user-email">{user.email}</span>
             <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Logg ut</button>
