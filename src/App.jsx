@@ -702,6 +702,14 @@ export default function App() {
           <span className="header-date">{todayKey()}</span>
           <div className="header-dot" />
           <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"8px"}}>
+            <button onClick={() => setTab("profile")} title="Profil" style={{
+              width:"32px", height:"32px", borderRadius:"50%", border:"1px solid var(--border)",
+              background: avatarUrl ? "none" : "#F97316", overflow:"hidden", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontFamily:"'Bebas Neue',sans-serif", fontSize:"1rem", color:"#000", padding:0, flexShrink:0
+            }}>
+              {avatarUrl ? <img src={avatarUrl} alt="profil" style={{width:"100%",height:"100%",objectFit:"cover"}} /> : (profile.username ? profile.username[0].toUpperCase() : user.email[0].toUpperCase())}
+            </button>
             <button className="btn-settings" onClick={() => setShowSettings(true)} title="Innstillinger">⚙</button>
             <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Logg ut</button>
           </div>
