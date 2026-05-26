@@ -173,9 +173,25 @@ const styles = `
   .load-banner-text { font-family: 'DM Mono', monospace; font-size: .7rem; color: #F97316; letter-spacing: 1px; flex: 1; }
   .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
-  /* THEME TOGGLE */
-  .btn-theme { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 1rem; width: 32px; height: 32px; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; }
-  .btn-theme:hover { border-color: #F97316; }
+  /* SETTINGS */
+  .btn-settings { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 1rem; width: 32px; height: 32px; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center; }
+  .btn-settings:hover { border-color: #F97316; color: #F97316; }
+  .settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; animation: fadeIn .2s ease; }
+  .settings-panel { position: fixed; top: 0; right: 0; height: 100vh; width: 280px; background: var(--surface); border-left: 1px solid var(--border); z-index: 101; padding: 28px 24px; display: flex; flex-direction: column; gap: 0; animation: slideInRight .25s ease; }
+  @keyframes slideInRight { from{transform:translateX(100%)} to{transform:translateX(0)} }
+  .settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+  .settings-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 2px; }
+  .settings-close { background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: 4px; transition: color .15s; }
+  .settings-close:hover { color: #e53e3e; }
+  .settings-section { margin-bottom: 28px; }
+  .settings-label { font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .theme-toggle { display: flex; gap: 8px; }
+  .theme-btn { flex: 1; padding: 10px; border: 1px solid var(--border); background: none; color: var(--text); font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: 1px; cursor: pointer; transition: all .15s; }
+  .theme-btn.active { border-color: #F97316; color: #F97316; background: none; }
+  .palette-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .palette-swatch { aspect-ratio: 1; border-radius: 50%; border: 3px solid transparent; cursor: pointer; transition: all .15s; outline: none; }
+  .palette-swatch.active { border-color: #F97316; transform: scale(1.1); }
+  .palette-name { font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); text-align: center; margin-top: 6px; }
 
   /* AUTH */
   .auth-screen { min-height: 100vh; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -334,6 +350,7 @@ function AuthScreen() {
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("ironlog-theme") !== "light");
   const [lightPalette, setLightPalette] = useState(() => localStorage.getItem("ironlog-palette") || "krem");
+  const [showSettings, setShowSettings] = useState(false);
 
   function setPalette(p) {
     setLightPalette(p);
@@ -343,13 +360,6 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState("dashboard");
 
-  function toggleTheme() {
-    setDarkMode(prev => {
-      const next = !prev;
-      localStorage.setItem("ironlog-theme", next ? "dark" : "light");
-      return next;
-    });
-  }
   const [clock, setClock] = useState(new Date());
   useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);
 
@@ -571,19 +581,54 @@ export default function App() {
     <>
       <style>{themeVars(darkMode, lightPalette) + styles}</style>
       <div className="tracker">
+        {showSettings && (
+          <>
+            <div className="settings-overlay" onClick={() => setShowSettings(false)} />
+            <div className="settings-panel">
+              <div className="settings-header">
+                <div className="settings-title">INNSTILLINGER</div>
+                <button className="settings-close" onClick={() => setShowSettings(false)}>✕</button>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-label">Tema</div>
+                <div className="theme-toggle">
+                  <button className={`theme-btn${darkMode ? " active" : ""}`} onClick={() => { setDarkMode(true); localStorage.setItem("ironlog-theme","dark"); }}>🌙 Mørk</button>
+                  <button className={`theme-btn${!darkMode ? " active" : ""}`} onClick={() => { setDarkMode(false); localStorage.setItem("ironlog-theme","light"); }}>☀ Lys</button>
+                </div>
+              </div>
+
+              {!darkMode && (
+                <div className="settings-section">
+                  <div className="settings-label">Fargepalett</div>
+                  <div className="palette-grid">
+                    {Object.entries({krem:"#F0ECE4", skifer:"#E4E9EF", salvie:"#E4EDE6", lavendel:"#EAE6F0"}).map(([name, color]) => (
+                      <div key={name}>
+                        <button className={`palette-swatch${lightPalette===name?" active":""}`}
+                          style={{background:color, width:"100%"}}
+                          onClick={() => setPalette(name)} />
+                        <div className="palette-name">{name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{marginTop:"auto"}}>
+                <div className="settings-label">Konto</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginBottom:"12px"}}>{user.email}</div>
+                <button className="btn-ghost" style={{width:"100%"}} onClick={() => supabase.auth.signOut()}>Logg ut</button>
+              </div>
+            </div>
+          </>
+        )}
+
         <div className="header">
           <h1>IRON<span style={{color:ACCENT}}>LOG</span></h1>
           <span className="header-date">{todayKey()}</span>
           <div className="header-dot" />
           <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"8px"}}>
-            {!darkMode && Object.entries({krem:"#F0ECE4", skifer:"#E4E9EF", salvie:"#E4EDE6", lavendel:"#EAE6F0"}).map(([name, color]) => (
-              <button key={name} onClick={() => setPalette(name)} title={name} style={{
-                width:"18px", height:"18px", borderRadius:"50%", background:color, border: lightPalette===name ? "2px solid #F97316" : "2px solid transparent",
-                cursor:"pointer", padding:0, flexShrink:0
-              }} />
-            ))}
-            <button className="btn-theme" onClick={toggleTheme}>{darkMode ? "☀" : "🌙"}</button>
-            <span className="user-email">{user.email}</span>
+            <button className="btn-settings" onClick={() => setShowSettings(true)} title="Innstillinger">⚙</button>
             <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Logg ut</button>
           </div>
         </div>
