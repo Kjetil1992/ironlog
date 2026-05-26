@@ -1184,32 +1184,53 @@ export default function App() {
 
           {/* ── LØPING ── */}
           {tab === "running" && (() => {
-            const previewPace = calcPace(parseFloat(runForm.distance), (parseInt(runForm.hours)||0)*3600 + (parseInt(runForm.minutes)||0)*60 + (parseInt(runForm.seconds)||0));
             const totalKm = runs.reduce((s,r) => s + parseFloat(r.distance), 0);
-            const avgPace = runs.length ? calcPace(totalKm, runs.reduce((s,r) => s + r.duration, 0)) : null;
-            const bestPace = runs.length ? calcPace(1, Math.min(...runs.map(r => r.duration / r.distance))) : null;
+            const totalDuration = runs.reduce((s,r) => s + r.duration, 0);
+            const avgPace = runs.length ? calcPace(totalKm, totalDuration) : null;
+            const longestRun = runs.length ? Math.max(...runs.map(r => parseFloat(r.distance))) : 0;
+
+            const now = new Date();
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - ((now.getDay()+6)%7));
+            monday.setHours(0,0,0,0);
+            const weekRuns = runs.filter(r => new Date(r.date_key) >= monday);
+            const weekKm = weekRuns.reduce((s,r) => s + parseFloat(r.distance), 0);
+            const weekDuration = weekRuns.reduce((s,r) => s + r.duration, 0);
+
+            const monthKey = now.toISOString().slice(0,7);
+            const monthRuns = runs.filter(r => r.date_key.startsWith(monthKey));
+            const monthKm = monthRuns.reduce((s,r) => s + parseFloat(r.distance), 0);
+
             const weeklyData = (() => {
               const weeks = {};
               runs.forEach(r => {
                 const d = new Date(r.date_key);
-                const monday = new Date(d);
-                monday.setDate(d.getDate() - ((d.getDay()+6)%7));
-                const key = monday.toISOString().slice(5,10);
+                const mon = new Date(d);
+                mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+                const key = mon.toISOString().slice(5,10);
                 weeks[key] = (weeks[key]||0) + parseFloat(r.distance);
               });
               return Object.entries(weeks).sort((a,b)=>a[0]>b[0]?1:-1).slice(-10).map(([date,km])=>({date, km: Math.round(km*10)/10}));
             })();
+
+            const monthlyData = (() => {
+              const months = {};
+              runs.forEach(r => {
+                const key = r.date_key.slice(0,7);
+                months[key] = (months[key]||0) + parseFloat(r.distance);
+              });
+              return Object.entries(months).sort((a,b)=>a[0]>b[0]?1:-1).slice(-6).map(([date,km])=>({date: date.slice(5), km: Math.round(km*10)/10}));
+            })();
+
             const prDistances = [5, 10, 21.1, 42.2];
             const prs = prDistances.map(dist => {
               const eligible = runs.filter(r => parseFloat(r.distance) >= dist);
               if (!eligible.length) return { dist, time: null };
-              const best = eligible.reduce((b,r) => {
-                const pace = r.duration / parseFloat(r.distance);
-                return pace < b.duration / parseFloat(b.distance) ? r : b;
-              });
-              const estSecs = Math.round(best.duration / parseFloat(best.distance) * dist);
-              return { dist, time: fmtDuration(estSecs) };
+              const best = eligible.reduce((b,r) => (r.duration/parseFloat(r.distance)) < (b.duration/parseFloat(b.distance)) ? r : b);
+              return { dist, time: fmtDuration(Math.round(best.duration / parseFloat(best.distance) * dist)) };
             });
+
+            const recentRuns = runs.slice(0, 5);
 
             return (
               <>
@@ -1224,117 +1245,99 @@ export default function App() {
                   ) : (
                     <>
                       <span className="strava-status">Ikke koblet til Strava</span>
-                      <button className="btn-strava" onClick={connectStrava}>
-                        Koble til Strava
-                      </button>
+                      <button className="btn-strava" onClick={connectStrava}>Koble til Strava</button>
                     </>
                   )}
                   {stravaMsg && <span className={`strava-msg${stravaMsg.includes("Feil") ? " err" : ""}`}>{stravaMsg}</span>}
                 </div>
 
-                <div className="subnav">
-                  <button className={`subnav-btn${runSubNav==="log"?" active":""}`} onClick={() => setRunSubNav("log")}>Logg</button>
-                  <button className={`subnav-btn${runSubNav==="history"?" active":""}`} onClick={() => setRunSubNav("history")}>Historikk</button>
-                  <button className={`subnav-btn${runSubNav==="stats"?" active":""}`} onClick={() => setRunSubNav("stats")}>Statistikk</button>
-                </div>
-
-                {runSubNav === "log" && (
+                {runs.length === 0 ? (
+                  <div className="empty">synk fra Strava for å se statistikk</div>
+                ) : (
                   <>
-                    <div className="section-title">NY <span>LØPETUR</span></div>
-                    <div className="run-type-grid">
-                      {["Vei","Terreng","Mølle","Intervall"].map(t => (
-                        <button key={t} className={`run-type-btn${runForm.type===t?" active":""}`} onClick={() => setRunForm(f=>({...f,type:t}))}>{t}</button>
-                      ))}
-                    </div>
-                    <div className="form-2col" style={{marginBottom:"8px"}}>
-                      <div className="field">
-                        <label>Distanse (km)</label>
-                        <input type="number" step="0.01" min="0" value={runForm.distance} onChange={e=>setRunForm(f=>({...f,distance:e.target.value}))} placeholder="5.0" />
+                    {/* Totalt */}
+                    <div className="graph-title" style={{marginBottom:"10px"}}>TOTALT</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"24px"}}>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{Math.round(totalKm*10)/10}</div>
+                        <div className="dash-label">Kilometer</div>
+                      </div>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{runs.length}</div>
+                        <div className="dash-label">Løpeturer</div>
+                      </div>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{avgPace||"–"}</div>
+                        <div className="dash-label">Snitt tempo (min/km)</div>
+                      </div>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{Math.round(longestRun*10)/10}</div>
+                        <div className="dash-label">Lengste tur (km)</div>
                       </div>
                     </div>
-                    <div className="run-time-row">
-                      <div className="field">
-                        <label>Timer</label>
-                        <input type="number" min="0" max="9" value={runForm.hours} onChange={e=>setRunForm(f=>({...f,hours:e.target.value}))} placeholder="0" />
-                      </div>
-                      <div className="field">
-                        <label>Minutter</label>
-                        <input type="number" min="0" max="59" value={runForm.minutes} onChange={e=>setRunForm(f=>({...f,minutes:e.target.value}))} placeholder="25" />
-                      </div>
-                      <div className="field">
-                        <label>Sekunder</label>
-                        <input type="number" min="0" max="59" value={runForm.seconds} onChange={e=>setRunForm(f=>({...f,seconds:e.target.value}))} placeholder="0" />
-                      </div>
-                    </div>
-                    {previewPace && (
-                      <div className="pace-display">
-                        <div>
-                          <div className="pace-label">Tempo</div>
-                          <div className="pace-val">{previewPace}</div>
-                        </div>
-                        <div style={{textAlign:"right"}}>
-                          <div className="pace-label">min/km</div>
-                          <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginTop:"4px"}}>{runForm.distance} km · {fmtDuration((parseInt(runForm.hours)||0)*3600+(parseInt(runForm.minutes)||0)*60+(parseInt(runForm.seconds)||0))}</div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="field" style={{marginBottom:"16px"}}>
-                      <label>Notater (valgfritt)</label>
-                      <input value={runForm.notes} onChange={e=>setRunForm(f=>({...f,notes:e.target.value}))} placeholder="Føltes bra, vind fra nord..." />
-                    </div>
-                    <div className="save-row">
-                      <button className="btn-outline" onClick={saveRun} disabled={!runForm.distance||(!runForm.minutes&&!runForm.seconds&&!runForm.hours)}>LAGRE LØPETUR</button>
-                      {runSaved && <span className="save-msg">✓ LØPETUR LAGRET</span>}
-                    </div>
-                  </>
-                )}
 
-                {runSubNav === "history" && (
-                  <>
-                    {runs.length === 0 ? <div className="empty">ingen løpeturer ennå</div> : runs.map(run => (
+                    {/* Denne uken */}
+                    <div className="graph-title" style={{marginBottom:"10px"}}>DENNE UKEN</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px",marginBottom:"24px"}}>
+                      <div className="stat-card"><div className="stat-val">{Math.round(weekKm*10)/10}</div><div className="stat-label">Km</div></div>
+                      <div className="stat-card"><div className="stat-val">{weekRuns.length}</div><div className="stat-label">Turer</div></div>
+                      <div className="stat-card"><div className="stat-val">{weekDuration > 0 ? fmtDuration(weekDuration) : "–"}</div><div className="stat-label">Tid</div></div>
+                    </div>
+
+                    {/* Denne måneden */}
+                    <div className="graph-title" style={{marginBottom:"10px"}}>DENNE MÅNEDEN</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"28px"}}>
+                      <div className="stat-card"><div className="stat-val">{Math.round(monthKm*10)/10}</div><div className="stat-label">Km</div></div>
+                      <div className="stat-card"><div className="stat-val">{monthRuns.length}</div><div className="stat-label">Turer</div></div>
+                    </div>
+
+                    {/* Ukentlig graf */}
+                    <div className="graph-section">
+                      <div className="graph-title">Km per uke</div>
+                      <div className="graph-box">
+                        <ResponsiveContainer width="100%" height={160}>
+                          <BarChart data={weeklyData}>
+                            <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={30} />
+                            <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v=>[`${v} km`,"Distanse"]} />
+                            <Bar dataKey="km" fill="#F97316" radius={[2,2,0,0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Månedlig graf */}
+                    <div className="graph-section">
+                      <div className="graph-title">Km per måned</div>
+                      <div className="graph-box">
+                        <ResponsiveContainer width="100%" height={160}>
+                          <BarChart data={monthlyData}>
+                            <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={30} />
+                            <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v=>[`${v} km`,"Distanse"]} />
+                            <Bar dataKey="km" fill="#F97316" radius={[2,2,0,0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Siste turer */}
+                    <div className="graph-title" style={{marginBottom:"12px"}}>SISTE TURER</div>
+                    {recentRuns.map(run => (
                       <div key={run.id} className="run-entry">
                         <div>
                           <div className="run-dist">{parseFloat(run.distance).toFixed(1)}</div>
                           <div className="run-dist-unit">km</div>
                         </div>
                         <div className="run-meta">
-                          <div className="run-meta-date">{run.date}</div>
-                          <div className="run-meta-detail">
-                            {fmtDuration(run.duration)} · {calcPace(parseFloat(run.distance), run.duration)} min/km · {run.type}
-                            {run.notes && ` · ${run.notes}`}
-                          </div>
+                          <div className="run-meta-date">{run.notes || run.type}</div>
+                          <div className="run-meta-detail">{run.date_key} · {fmtDuration(run.duration)} · {calcPace(parseFloat(run.distance), run.duration)} min/km</div>
                         </div>
-                        <button className="btn-icon" onClick={() => deleteRun(run.id)}>🗑</button>
                       </div>
                     ))}
-                  </>
-                )}
 
-                {runSubNav === "stats" && (
-                  <>
-                    <div className="run-stat-row">
-                      <div className="stat-card"><div className="stat-val">{Math.round(totalKm*10)/10}</div><div className="stat-label">Totale km</div></div>
-                      <div className="stat-card"><div className="stat-val">{runs.length}</div><div className="stat-label">Løpeturer</div></div>
-                      <div className="stat-card"><div className="stat-val">{bestPace||"–"}</div><div className="stat-label">Beste tempo</div></div>
-                    </div>
-
-                    <div className="graph-section">
-                      <div className="graph-title">Km per uke</div>
-                      {weeklyData.length > 0 ? (
-                        <div className="graph-box">
-                          <ResponsiveContainer width="100%" height={180}>
-                            <BarChart data={weeklyData}>
-                              <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
-                              <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={35} />
-                              <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v=>[`${v} km`,"Distanse"]} />
-                              <Bar dataKey="km" fill="#F97316" radius={[2,2,0,0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      ) : <div className="graph-empty">logg løpeturer for å se ukentlig oversikt</div>}
-                    </div>
-
-                    <div className="top-list-title" style={{marginBottom:"12px"}}>Estimerte PR-tider</div>
+                    {/* PR-tider */}
+                    <div className="graph-title" style={{marginTop:"24px",marginBottom:"12px"}}>ESTIMERTE PR-TIDER</div>
                     <div className="run-pr-grid">
                       {prs.map(({dist, time}) => (
                         <div key={dist} className="run-pr-card">
