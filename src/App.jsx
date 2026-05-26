@@ -635,8 +635,8 @@ export default function App() {
     if (params.get("strava_error")) {
       setSection("løping");
       setTab("running");
-      setStravaMsg("Klarte ikke koble til Strava");
-      setTimeout(() => setStravaMsg(""), 4000);
+      const reason = params.get("reason") || "";
+      setStravaMsg("Feil: " + (reason || "Klarte ikke koble til Strava"));
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);

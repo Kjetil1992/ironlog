@@ -4,7 +4,7 @@ module.exports = async function handler(req, res) {
   const { code, state: userId, error } = req.query
 
   if (error || !code || !userId) {
-    return res.redirect('/?strava_error=1')
+    return res.redirect(`/?strava_error=1&reason=missing_params&error=${error || 'none'}`)
   }
 
   const tokenRes = await fetch('https://www.strava.com/oauth/token', {
@@ -21,7 +21,8 @@ module.exports = async function handler(req, res) {
   const token = await tokenRes.json()
 
   if (!token.access_token) {
-    return res.redirect('/?strava_error=1')
+    const reason = encodeURIComponent(JSON.stringify(token))
+    return res.redirect(`/?strava_error=1&reason=${reason}`)
   }
 
   const supabase = createClient(
@@ -29,7 +30,7 @@ module.exports = async function handler(req, res) {
     process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  await supabase.from('strava_tokens').upsert({
+  const { error: dbError } = await supabase.from('strava_tokens').upsert({
     user_id: userId,
     athlete_id: token.athlete?.id,
     access_token: token.access_token,
@@ -37,6 +38,10 @@ module.exports = async function handler(req, res) {
     expires_at: token.expires_at,
     updated_at: new Date().toISOString(),
   })
+
+  if (dbError) {
+    return res.redirect(`/?strava_error=1&reason=db_${encodeURIComponent(dbError.message)}`)
+  }
 
   res.redirect('/?strava_connected=1')
 }
