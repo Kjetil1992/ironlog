@@ -247,17 +247,17 @@ const styles = `
   .landing-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; }
   .landing-greeting { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
   .landing-question { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; margin-bottom: 40px; text-align: center; }
-  .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 500px; }
-  @media (max-width: 460px) { .landing-grid { grid-template-columns: 1fr; max-width: 300px; } }
-  .landing-card { position: relative; border: 1px solid var(--border); background: var(--surface); padding: 44px 28px 36px; cursor: pointer; transition: all .2s; overflow: hidden; text-align: left; }
-  .landing-card:hover { border-color: #F97316; transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
-  .landing-card-icon { font-size: 2.8rem; margin-bottom: 20px; line-height: 1; display: block; }
-  .landing-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 3px; margin-bottom: 8px; display: block; }
+  .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 560px; }
+  @media (max-width: 480px) { .landing-grid { grid-template-columns: 1fr; max-width: 320px; } }
+  .landing-card { position: relative; border: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: border-color .2s, transform .2s, box-shadow .2s; overflow: hidden; text-align: left; }
+  .landing-card:hover { border-color: #F97316; transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.15); }
+  .landing-card-img { width: 100%; height: 220px; object-fit: cover; display: block; transition: transform .4s ease; }
+  .landing-card:hover .landing-card-img { transform: scale(1.05); }
+  .landing-card-info { padding: 20px 22px 24px; }
+  .landing-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 3px; margin-bottom: 6px; display: block; }
   .landing-card-sub { font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); display: block; }
   .landing-card-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #F97316; transform: scaleX(0); transition: transform .25s ease; transform-origin: left; }
   .landing-card:hover .landing-card-bar { transform: scaleX(1); }
-  .landing-card-arrow { position: absolute; top: 20px; right: 20px; font-size: 1.2rem; color: var(--border2); transition: color .2s; }
-  .landing-card:hover .landing-card-arrow { color: #F97316; }
 
   /* AUTH */
   .auth-screen { min-height: 100vh; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -798,17 +798,19 @@ export default function App() {
             <div className="landing-question">VELG AKTIVITET</div>
             <div className="landing-grid">
               <button className="landing-card" onClick={() => { setSection("styrke"); setTab("dashboard"); }}>
-                <span className="landing-card-arrow">→</span>
-                <span className="landing-card-icon">🏋️</span>
-                <span className="landing-card-title">STYRKE</span>
-                <span className="landing-card-sub">Logg økt · programmer · PR</span>
+                <img className="landing-card-img" src="/styrke.jpg" alt="Styrke" />
+                <div className="landing-card-info">
+                  <span className="landing-card-title">STYRKE</span>
+                  <span className="landing-card-sub">Logg økt · programmer · PR</span>
+                </div>
                 <div className="landing-card-bar" />
               </button>
               <button className="landing-card" onClick={() => { setSection("løping"); setTab("running"); }}>
-                <span className="landing-card-arrow">→</span>
-                <span className="landing-card-icon">🏃</span>
-                <span className="landing-card-title">LØPING</span>
-                <span className="landing-card-sub">Logg tur · historikk · stats</span>
+                <img className="landing-card-img" src="/loping.jpg" alt="Løping" />
+                <div className="landing-card-info">
+                  <span className="landing-card-title">LØPING</span>
+                  <span className="landing-card-sub">Logg tur · historikk · stats</span>
+                </div>
                 <div className="landing-card-bar" />
               </button>
             </div>
