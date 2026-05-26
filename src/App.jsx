@@ -1902,6 +1902,103 @@ export default function App() {
               )}
             </>
           )}
+          {/* ── PROFIL ── */}
+          {tab === "profile" && (
+            <>
+              <div className="profile-top">
+                <div className="profile-avatar" onClick={() => avatarInputRef.current?.click()} style={{cursor:"pointer"}}>
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt="avatar" />
+                    : (profile.username ? profile.username[0].toUpperCase() : user.email[0].toUpperCase())}
+                  <div className="profile-avatar-upload">Bytt bilde</div>
+                  <input ref={avatarInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={uploadAvatar} />
+                </div>
+                <div>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.6rem",letterSpacing:"2px"}}>
+                    {profile.username || "Ingen navn"}
+                  </div>
+                  <div className="profile-email">{user.email}</div>
+                </div>
+              </div>
+
+              <div className="profile-stats">
+                <div className="profile-stat">
+                  <div className="profile-stat-val">{history.length}</div>
+                  <div className="profile-stat-label">Styrkeøkter</div>
+                </div>
+                <div className="profile-stat">
+                  <div className="profile-stat-val">{runs.length}</div>
+                  <div className="profile-stat-label">Løpeturer</div>
+                </div>
+                <div className="profile-stat">
+                  <div className="profile-stat-val">{rides.length}</div>
+                  <div className="profile-stat-label">Sykkelture</div>
+                </div>
+              </div>
+
+              <div className="profile-grid">
+                <div className="field">
+                  <label>Brukernavn</label>
+                  <input value={profile.username} onChange={e => setProfile(p => ({...p, username: e.target.value}))} placeholder="Ditt navn" />
+                </div>
+                <div className="field">
+                  <label>Alder</label>
+                  <input type="number" value={profile.age} onChange={e => setProfile(p => ({...p, age: e.target.value}))} placeholder="25" />
+                </div>
+                <div className="field">
+                  <label>Vekt (kg)</label>
+                  <input type="number" step="0.1" value={profile.weight} onChange={e => setProfile(p => ({...p, weight: e.target.value}))} placeholder="75" />
+                </div>
+                <div className="field">
+                  <label>Høyde (cm)</label>
+                  <input type="number" value={profile.height} onChange={e => setProfile(p => ({...p, height: e.target.value}))} placeholder="180" />
+                </div>
+              </div>
+
+              <div style={{marginBottom:"20px"}}>
+                <div className="settings-label" style={{marginBottom:"10px"}}>Treningsmål</div>
+                <div className="goal-grid">
+                  {["Bygge muskler","Gå ned i vekt","Løpe maraton","Bedre kondis","Øke styrke","Bli mer fleksibel"].map(g => (
+                    <button key={g} className={`goal-btn${(profile.goals||[]).includes(g)?" active":""}`} onClick={() => toggleGoal(g)}>{g}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="save-row" style={{marginBottom:"32px"}}>
+                <button className="btn-orange" onClick={saveProfile}>LAGRE PROFIL</button>
+                {profileSaved && <span className="save-msg">✓ LAGRET</span>}
+              </div>
+
+              <hr className="divider" />
+
+              <div style={{marginBottom:"8px"}}>
+                <div className="graph-title" style={{marginBottom:"12px"}}>LOGG VEKT</div>
+                <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
+                  <div className="field" style={{flex:1,margin:0}}>
+                    <input type="number" step="0.1" value={newWeight} onChange={e => setNewWeight(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && logWeight()} placeholder="Dagens vekt (kg)" />
+                  </div>
+                  <button className="btn-orange" onClick={logWeight}>LOGG</button>
+                </div>
+                {weightLogs.length > 1 && (
+                  <div className="graph-box" style={{marginBottom:"16px"}}>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={weightLogs.slice(-20).map(l => ({date: l.logged_at?.slice(5), kg: l.weight}))}>
+                        <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={35} domain={["auto","auto"]} />
+                        <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v=>[`${v} kg`,"Vekt"]} />
+                        <Line type="monotone" dataKey="kg" stroke="#F97316" strokeWidth={2} dot={{fill:"#F97316",r:3}} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              <hr className="divider" />
+              <button className="btn-ghost" style={{width:"100%",marginTop:"8px"}} onClick={() => supabase.auth.signOut()}>Logg ut</button>
+            </>
+          )}
+
         </div>
       </div>
     </>
