@@ -199,6 +199,16 @@ const styles = `
   .run-pr-val { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; color: #F97316; line-height: 1; }
   .run-pr-sub { font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--muted2); margin-top: 3px; }
 
+  /* STRAVA */
+  .strava-bar { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); padding: 12px 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .btn-strava { background: #FC4C02; border: none; color: #fff; font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 1px; padding: 9px 18px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity .15s; white-space: nowrap; }
+  .btn-strava:hover { opacity: .85; }
+  .btn-strava:disabled { opacity: .5; cursor: not-allowed; }
+  .strava-status { font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: 1px; color: var(--muted); }
+  .strava-status.connected { color: #4caf50; }
+  .strava-msg { font-family: 'DM Mono', monospace; font-size: .7rem; color: #4caf50; letter-spacing: 1px; animation: fadeIn .3s ease; }
+  .strava-msg.err { color: #e53e3e; }
+
   /* SUBNAV */
   .subnav { display: flex; gap: 4px; background: var(--surface2); padding: 4px; margin-bottom: 24px; }
   .subnav-btn { flex: 1; font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: 2px; text-transform: uppercase; padding: 9px 4px; border: none; background: none; color: var(--muted); cursor: pointer; transition: all .2s; text-align: center; }
@@ -431,6 +441,40 @@ export default function App() {
   const [runs, setRuns] = useState([]);
   const [runForm, setRunForm] = useState({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "" });
   const [runSaved, setRunSaved] = useState(false);
+  const [stravaConnected, setStravaConnected] = useState(false);
+  const [stravaSyncing, setStravaSyncing] = useState(false);
+  const [stravaMsg, setStravaMsg] = useState("");
+
+  async function checkStravaConnection() {
+    const { data } = await supabase.from("strava_tokens").select("user_id").eq("user_id", user?.id).maybeSingle();
+    setStravaConnected(!!data);
+  }
+
+  function connectStrava() {
+    const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
+    const redirectUri = `${window.location.origin}/api/strava-callback`;
+    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=activity:read_all&state=${user.id}`;
+    window.location.href = url;
+  }
+
+  async function syncStrava() {
+    setStravaSyncing(true);
+    setStravaMsg("");
+    try {
+      const res = await fetch(`/api/strava-sync?user_id=${user.id}`);
+      const data = await res.json();
+      if (data.imported !== undefined) {
+        setStravaMsg(data.imported > 0 ? `✓ ${data.imported} nye løpeturer importert` : "✓ Ingen nye løpeturer");
+        if (data.imported > 0) await loadRuns();
+      } else {
+        setStravaMsg("Feil ved synk");
+      }
+    } catch {
+      setStravaMsg("Feil ved synk");
+    }
+    setStravaSyncing(false);
+    setTimeout(() => setStravaMsg(""), 4000);
+  }
 
   async function loadRuns() {
     const { data } = await supabase.from("runs").select("*").order("date_key", { ascending: false });
@@ -581,6 +625,25 @@ export default function App() {
     }
   }
 
+  // Handle Strava OAuth callback URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("strava_connected")) {
+      setSection("løping");
+      setTab("running");
+      setStravaMsg("✓ Strava koblet til!");
+      setTimeout(() => setStravaMsg(""), 4000);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    if (params.get("strava_error")) {
+      setSection("løping");
+      setTab("running");
+      setStravaMsg("Klarte ikke koble til Strava");
+      setTimeout(() => setStravaMsg(""), 4000);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   // Load data when user logs in
   useEffect(() => {
     if (!user) { setHistory([]); setPrograms([]); setProfile({ username:"", weight:"", height:"", age:"", goals:[] }); return; }
@@ -588,6 +651,7 @@ export default function App() {
     loadPrograms();
     loadProfile();
     loadRuns();
+    checkStravaConnection();
   }, [user]);
 
   async function loadHistory() {
@@ -1152,6 +1216,25 @@ export default function App() {
 
             return (
               <>
+                <div className="strava-bar">
+                  {stravaConnected ? (
+                    <>
+                      <span className="strava-status connected">● Strava tilkoblet</span>
+                      <button className="btn-strava" onClick={syncStrava} disabled={stravaSyncing}>
+                        {stravaSyncing ? "Synkroniserer..." : "↻ Synk fra Strava"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="strava-status">Ikke koblet til Strava</span>
+                      <button className="btn-strava" onClick={connectStrava}>
+                        Koble til Strava
+                      </button>
+                    </>
+                  )}
+                  {stravaMsg && <span className={`strava-msg${stravaMsg.includes("Feil") ? " err" : ""}`}>{stravaMsg}</span>}
+                </div>
+
                 <div className="subnav">
                   <button className={`subnav-btn${runSubNav==="log"?" active":""}`} onClick={() => setRunSubNav("log")}>Logg</button>
                   <button className={`subnav-btn${runSubNav==="history"?" active":""}`} onClick={() => setRunSubNav("history")}>Historikk</button>
