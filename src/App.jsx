@@ -1,6 +1,16 @@
 ﻿import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
+import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
 
 const ACCENT = "#F97316";
 
@@ -368,6 +378,179 @@ function ExerciseForm({ form, setForm, onAdd }) {
   );
 }
 
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({ click: (e) => onMapClick(e.latlng) });
+  return null;
+}
+
+function RouteMap({ sport, user }) {
+  const [waypoints, setWaypoints] = useState([]);
+  const [routeLine, setRouteLine] = useState([]);
+  const [distance, setDistance] = useState(null);
+  const [routeName, setRouteName] = useState("");
+  const [savedRoutes, setSavedRoutes] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [savingRoute, setSavingRoute] = useState(false);
+
+  useEffect(() => { loadSavedRoutes(); }, []);
+
+  useEffect(() => {
+    if (waypoints.length >= 2) calculateRoute();
+    else { setRouteLine([]); setDistance(null); }
+  }, [waypoints]);
+
+  async function loadSavedRoutes() {
+    const { data } = await supabase.from("planned_routes").select("*").eq("user_id", user.id).eq("sport", sport).order("created_at", { ascending: false });
+    if (data) setSavedRoutes(data);
+  }
+
+  async function geocodeSearch() {
+    if (!searchQuery.trim()) return;
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=4&accept-language=no`);
+    const data = await res.json();
+    setSearchResults(data);
+  }
+
+  function pickSearchResult(r) {
+    setWaypoints(prev => [...prev, { lat: parseFloat(r.lat), lng: parseFloat(r.lon) }]);
+    setSearchResults([]);
+    setSearchQuery("");
+  }
+
+  function handleMapClick(latlng) {
+    setWaypoints(prev => [...prev, { lat: latlng.lat, lng: latlng.lng }]);
+  }
+
+  function removeWaypoint(i) {
+    setWaypoints(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function calculateRoute() {
+    setRouteLoading(true);
+    const profile = sport === "sykkel" ? "bike" : "foot";
+    const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(";");
+    try {
+      const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${coords}?overview=full&geometries=geojson`);
+      const data = await res.json();
+      if (data.routes?.[0]) {
+        setRouteLine(data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]));
+        setDistance(Math.round(data.routes[0].distance / 100) / 10);
+      }
+    } catch {}
+    setRouteLoading(false);
+  }
+
+  async function saveRoute() {
+    if (!routeName.trim() || waypoints.length < 2) return;
+    setSavingRoute(true);
+    const { data } = await supabase.from("planned_routes").insert({ user_id: user.id, name: routeName, sport, waypoints, distance }).select().single();
+    if (data) { setSavedRoutes(prev => [data, ...prev]); setRouteName(""); }
+    setSavingRoute(false);
+  }
+
+  async function deleteRoute(id) {
+    await supabase.from("planned_routes").delete().eq("id", id);
+    setSavedRoutes(prev => prev.filter(r => r.id !== id));
+  }
+
+  function loadRoute(route) {
+    setWaypoints(route.waypoints);
+  }
+
+  const mapCenter = [60.4, 8.5];
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}>
+        <input
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && geocodeSearch()}
+          placeholder="Søk etter sted eller adresse..."
+          style={{flex:1,background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",padding:"10px 12px",fontFamily:"'DM Sans',sans-serif",fontSize:".9rem",outline:"none"}}
+        />
+        <button className="btn-orange" onClick={geocodeSearch}>Søk</button>
+      </div>
+
+      {searchResults.length > 0 && (
+        <div style={{background:"var(--surface)",border:"1px solid var(--border)",marginBottom:"8px",maxHeight:"180px",overflowY:"auto"}}>
+          {searchResults.map(r => (
+            <div key={r.place_id} onClick={() => pickSearchResult(r)}
+              style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid var(--border)",fontSize:".82rem",fontFamily:"'DM Sans',sans-serif"}}>
+              {r.display_name}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"2px",marginBottom:"6px",textTransform:"uppercase"}}>
+        Klikk på kartet for å legge til punkter
+      </div>
+
+      <MapContainer center={mapCenter} zoom={5} style={{height:"380px",border:"1px solid var(--border)",marginBottom:"12px",zIndex:0}}>
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
+        <MapClickHandler onMapClick={handleMapClick} />
+        {waypoints.map((wp, i) => <Marker key={i} position={[wp.lat, wp.lng]} />)}
+        {routeLine.length > 0 && <Polyline positions={routeLine} color="#F97316" weight={4} opacity={0.9} />}
+      </MapContainer>
+
+      <div style={{display:"flex",alignItems:"center",gap:"16px",marginBottom:"16px",flexWrap:"wrap"}}>
+        {distance !== null && (
+          <div>
+            <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:"#F97316",lineHeight:1}}>{distance}</span>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)",marginLeft:"4px"}}>km</span>
+          </div>
+        )}
+        {routeLoading && <span style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)",letterSpacing:"1px"}}>Beregner rute...</span>}
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)"}}>{waypoints.length} punkt{waypoints.length !== 1 ? "er" : ""}</span>
+        {waypoints.length > 0 && (
+          <button onClick={() => { setWaypoints([]); setRouteLine([]); setDistance(null); }} className="btn-ghost" style={{marginLeft:"auto",padding:"6px 14px",fontSize:".65rem"}}>Nullstill</button>
+        )}
+      </div>
+
+      {waypoints.length > 0 && (
+        <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"16px"}}>
+          {waypoints.map((_, i) => (
+            <span key={i} onClick={() => removeWaypoint(i)}
+              style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",border:"1px solid var(--border)",padding:"3px 10px",cursor:"pointer",color:"var(--muted)"}}>
+              Punkt {i+1} ✕
+            </span>
+          ))}
+        </div>
+      )}
+
+      {waypoints.length >= 2 && (
+        <div style={{display:"flex",gap:"8px",marginBottom:"28px"}}>
+          <input
+            value={routeName}
+            onChange={e => setRouteName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && saveRoute()}
+            placeholder="Gi ruten et navn..."
+            style={{flex:1,background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",padding:"10px 12px",fontFamily:"'DM Sans',sans-serif",fontSize:".9rem",outline:"none"}}
+          />
+          <button className="btn-orange" onClick={saveRoute} disabled={savingRoute}>{savingRoute ? "Lagrer..." : "LAGRE"}</button>
+        </div>
+      )}
+
+      <div style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",letterSpacing:"3px",textTransform:"uppercase",color:"var(--muted)",marginBottom:"12px"}}>LAGREDE RUTER</div>
+      {savedRoutes.length === 0 ? (
+        <div className="empty">ingen ruter lagret ennå</div>
+      ) : savedRoutes.map(route => (
+        <div key={route.id} style={{background:"var(--surface)",border:"1px solid var(--border)",padding:"14px 16px",marginBottom:"8px",display:"flex",alignItems:"center",gap:"12px"}}>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.1rem",letterSpacing:"1px"}}>{route.name}</div>
+            {route.distance && <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginTop:"2px"}}>{route.distance} km</div>}
+          </div>
+          <button onClick={() => loadRoute(route)} className="btn-outline" style={{padding:"6px 16px",fontSize:".85rem"}}>Last inn</button>
+          <button onClick={() => deleteRoute(route.id)} className="btn-icon">🗑</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AuthScreen() {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -437,7 +620,8 @@ export default function App() {
   const [section, setSection] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [subNav, setSubNav] = useState("history");
-  const [runSubNav, setRunSubNav] = useState("log");
+  const [runSubNav, setRunSubNav] = useState("stats");
+  const [cycleSubNav, setCycleSubNav] = useState("stats");
   const [runs, setRuns] = useState([]);
   const [runForm, setRunForm] = useState({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "" });
   const [runSaved, setRunSaved] = useState(false);
@@ -1226,7 +1410,16 @@ export default function App() {
           )}
 
           {/* ── LØPING ── */}
-          {tab === "running" && (() => {
+          {tab === "running" && (
+            <div className="subnav" style={{marginBottom:"24px"}}>
+              <button className={`subnav-btn${runSubNav==="stats"?" active":""}`} onClick={() => setRunSubNav("stats")}>Statistikk</button>
+              <button className={`subnav-btn${runSubNav==="plan"?" active":""}`} onClick={() => setRunSubNav("plan")}>Planlegg tur</button>
+            </div>
+          )}
+          {tab === "running" && runSubNav === "plan" && (
+            <RouteMap sport="løping" user={user} />
+          )}
+          {tab === "running" && runSubNav === "stats" && (() => {
             const totalKm = runs.reduce((s,r) => s + parseFloat(r.distance), 0);
             const totalDuration = runs.reduce((s,r) => s + r.duration, 0);
             const avgPace = runs.length ? calcPace(totalKm, totalDuration) : null;
@@ -1405,7 +1598,16 @@ export default function App() {
           })()}
 
           {/* ── SYKKEL ── */}
-          {tab === "cycling" && (() => {
+          {tab === "cycling" && (
+            <div className="subnav" style={{marginBottom:"24px"}}>
+              <button className={`subnav-btn${cycleSubNav==="stats"?" active":""}`} onClick={() => setCycleSubNav("stats")}>Statistikk</button>
+              <button className={`subnav-btn${cycleSubNav==="plan"?" active":""}`} onClick={() => setCycleSubNav("plan")}>Planlegg tur</button>
+            </div>
+          )}
+          {tab === "cycling" && cycleSubNav === "plan" && (
+            <RouteMap sport="sykkel" user={user} />
+          )}
+          {tab === "cycling" && cycleSubNav === "stats" && (() => {
             const totalKm = rides.reduce((s,r) => s + parseFloat(r.distance), 0);
             const totalDuration = rides.reduce((s,r) => s + r.duration, 0);
             const avgSpeed = rides.length ? calcSpeed(totalKm, totalDuration) : null;
