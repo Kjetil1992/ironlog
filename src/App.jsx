@@ -437,23 +437,42 @@ export default function App() {
   }, []);
 
   // Profile
-  const [profile, setProfile] = useState({ username: "", weight: "", height: "", age: "", goal: "" });
+  const [profile, setProfile] = useState({ username: "", weight: "", height: "", age: "", goals: [] });
   const [profileSaved, setProfileSaved] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const avatarInputRef = React.useRef(null);
 
+  const [weightLogs, setWeightLogs] = useState([]);
+  const [newWeight, setNewWeight] = useState("");
+
   async function loadProfile() {
     const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
     if (data) {
-      setProfile({ username: data.username||"", weight: data.weight||"", height: data.height||"", age: data.age||"", goal: data.goal||"" });
+      setProfile({ username: data.username||"", weight: data.weight||"", height: data.height||"", age: data.age||"", goals: data.goals||[] });
       if (data.avatar_url) setAvatarUrl(data.avatar_url);
     }
+    const { data: wl } = await supabase.from("weight_logs").select("*").order("logged_at", { ascending: true });
+    if (wl) setWeightLogs(wl);
   }
 
   async function saveProfile() {
-    await supabase.from("profiles").upsert({ id: user.id, ...profile, updated_at: new Date().toISOString() });
+    await supabase.from("profiles").upsert({ id: user.id, username: profile.username, weight: profile.weight, height: profile.height, age: profile.age, goals: profile.goals, updated_at: new Date().toISOString() });
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 2500);
+  }
+
+  function toggleGoal(g) {
+    setProfile(p => {
+      const goals = p.goals || [];
+      return { ...p, goals: goals.includes(g) ? goals.filter(x => x !== g) : [...goals, g] };
+    });
+  }
+
+  async function logWeight() {
+    if (!newWeight) return;
+    const { data } = await supabase.from("weight_logs").insert({ user_id: user.id, weight: parseFloat(newWeight), logged_at: todayKey() }).select().single();
+    if (data) setWeightLogs(prev => [...prev, data]);
+    setNewWeight("");
   }
 
   async function uploadAvatar(e) {
@@ -472,7 +491,7 @@ export default function App() {
 
   // Load data when user logs in
   useEffect(() => {
-    if (!user) { setHistory([]); setPrograms([]); setProfile({ username:"", weight:"", height:"", age:"", goal:"" }); return; }
+    if (!user) { setHistory([]); setPrograms([]); setProfile({ username:"", weight:"", height:"", age:"", goals:[] }); return; }
     loadHistory();
     loadPrograms();
     loadProfile();
@@ -1019,16 +1038,42 @@ export default function App() {
               </div>
 
               <div className="section-title" style={{fontSize:"1.2rem",marginTop:"20px"}}>TRENINGS<span>MÅL</span></div>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)",marginBottom:"10px",letterSpacing:"1px"}}>Velg ett eller flere</div>
               <div className="goal-grid">
                 {["Bygge muskler","Gå ned i vekt","Øke styrke","Hold formen","Kondisjon","Generell helse"].map(g => (
-                  <button key={g} className={`goal-btn${profile.goal===g?" active":""}`} onClick={() => setProfile(p => ({...p, goal: g}))}>{g}</button>
+                  <button key={g} className={`goal-btn${(profile.goals||[]).includes(g)?" active":""}`} onClick={() => toggleGoal(g)}>{g}</button>
                 ))}
               </div>
 
-              <div className="save-row">
+              <div className="save-row" style={{marginBottom:"32px"}}>
                 <button className="btn-outline" onClick={saveProfile}>LAGRE PROFIL</button>
                 {profileSaved && <span className="save-msg">✓ PROFIL LAGRET</span>}
               </div>
+
+              <div className="section-title" style={{fontSize:"1.2rem"}}>VEKT<span>LOGG</span></div>
+              <div style={{display:"flex",gap:"8px",marginBottom:"20px",alignItems:"flex-end"}}>
+                <div className="field" style={{flex:1}}>
+                  <label>Dagens vekt (kg)</label>
+                  <input type="number" step="0.1" value={newWeight} onChange={e => setNewWeight(e.target.value)} placeholder="80.5"
+                    onKeyDown={e => e.key === "Enter" && logWeight()} />
+                </div>
+                <button className="btn-orange" onClick={logWeight}>LOGG</button>
+              </div>
+
+              {weightLogs.length > 0 ? (
+                <div className="graph-box" style={{marginBottom:"16px"}}>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={weightLogs.map(w => ({ date: w.logged_at.slice(5), vekt: parseFloat(w.weight) }))}>
+                      <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                      <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={40} domain={["auto","auto"]} />
+                      <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v => [`${v} kg`,"Vekt"]} />
+                      <Line type="monotone" dataKey="vekt" stroke="#F97316" strokeWidth={2} dot={{fill:"#F97316",r:3}} activeDot={{r:5}} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="graph-empty">logg vekten din for å se utvikling</div>
+              )}
             </>
           )}
 
