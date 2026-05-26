@@ -257,8 +257,8 @@ const styles = `
   .landing-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; }
   .landing-greeting { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
   .landing-question { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; margin-bottom: 40px; text-align: center; }
-  .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 560px; }
-  @media (max-width: 480px) { .landing-grid { grid-template-columns: 1fr; max-width: 320px; } }
+  .landing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; max-width: 840px; }
+  @media (max-width: 680px) { .landing-grid { grid-template-columns: 1fr; max-width: 320px; } }
   .landing-card { position: relative; border: 1px solid var(--border); background: var(--surface); cursor: pointer; transition: border-color .2s, transform .2s, box-shadow .2s; overflow: hidden; text-align: left; }
   .landing-card:hover { border-color: #F97316; transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.15); }
   .landing-card-img { width: 100%; height: 220px; object-fit: cover; display: block; transition: transform .4s ease; }
@@ -444,6 +444,9 @@ export default function App() {
   const [stravaConnected, setStravaConnected] = useState(false);
   const [stravaSyncing, setStravaSyncing] = useState(false);
   const [stravaMsg, setStravaMsg] = useState("");
+  const [rides, setRides] = useState([]);
+  const [cyclingSyncing, setCyclingSyncing] = useState(false);
+  const [cyclingMsg, setCyclingMsg] = useState("");
 
   async function checkStravaConnection() {
     const { data } = await supabase.from("strava_tokens").select("user_id").eq("user_id", user?.id).maybeSingle();
@@ -476,6 +479,35 @@ export default function App() {
   async function loadRuns() {
     const { data } = await supabase.from("runs").select("*").order("date_key", { ascending: false });
     if (data) setRuns(data);
+  }
+
+  async function loadRides() {
+    const { data } = await supabase.from("rides").select("*").order("date_key", { ascending: false });
+    if (data) setRides(data);
+  }
+
+  async function syncStravaCycling() {
+    setCyclingSyncing(true);
+    setCyclingMsg("");
+    try {
+      const res = await fetch(`/api/strava-sync-cycling?user_id=${user.id}`);
+      const data = await res.json();
+      if (data.imported !== undefined) {
+        setCyclingMsg(data.imported > 0 ? `✓ ${data.imported} nye sykkelture importert` : "✓ Ingen nye sykkelture");
+        if (data.imported > 0) await loadRides();
+      } else {
+        setCyclingMsg("Feil ved synk");
+      }
+    } catch {
+      setCyclingMsg("Feil ved synk");
+    }
+    setCyclingSyncing(false);
+    setTimeout(() => setCyclingMsg(""), 4000);
+  }
+
+  function calcSpeed(distance, duration) {
+    if (!distance || !duration) return null;
+    return (distance / duration * 3600).toFixed(1);
   }
 
   async function saveRun() {
@@ -648,6 +680,7 @@ export default function App() {
     loadPrograms();
     loadProfile();
     loadRuns();
+    loadRides();
     checkStravaConnection();
   }, [user]);
 
@@ -870,7 +903,15 @@ export default function App() {
                 <img className="landing-card-img" src="/loping.jpg" alt="Løping" />
                 <div className="landing-card-info">
                   <span className="landing-card-title">LØPING</span>
-                  <span className="landing-card-sub">Logg tur · historikk · stats</span>
+                  <span className="landing-card-sub">Statistikk · tempo · PR</span>
+                </div>
+                <div className="landing-card-bar" />
+              </button>
+              <button className="landing-card" onClick={() => { setSection("sykkel"); setTab("cycling"); }}>
+                <img className="landing-card-img" src="/sykkel.jpg" alt="Sykkel" />
+                <div className="landing-card-info">
+                  <span className="landing-card-title">SYKKEL</span>
+                  <span className="landing-card-sub">Statistikk · fart · distanse</span>
                 </div>
                 <div className="landing-card-bar" />
               </button>
@@ -931,7 +972,7 @@ export default function App() {
           <button onClick={() => setSection(null)} style={{background:"none",border:"none",cursor:"pointer",padding:0,lineHeight:1,color:"inherit"}}>
             <h1>PUL<span style={{color:ACCENT}}>SE</span></h1>
           </button>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"2px",textTransform:"uppercase",background:"var(--surface2)",border:"1px solid var(--border)",padding:"2px 8px",marginLeft:"4px"}}>{section === "løping" ? "LØPING" : "STYRKE"}</span>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"2px",textTransform:"uppercase",background:"var(--surface2)",border:"1px solid var(--border)",padding:"2px 8px",marginLeft:"4px"}}>{section === "løping" ? "LØPING" : section === "sykkel" ? "SYKKEL" : "STYRKE"}</span>
           <span className="header-date" style={{marginLeft:"8px"}}>{todayKey()}</span>
           <div className="header-dot" />
           <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"8px"}}>
@@ -950,7 +991,9 @@ export default function App() {
 
         <div className="tabs">
           {(section === "løping"
-            ? [["running","LOGG"],["profile","PROFIL"]]
+            ? [["running","LØPING"],["profile","PROFIL"]]
+            : section === "sykkel"
+            ? [["cycling","SYKKEL"],["profile","PROFIL"]]
             : [["dashboard","DASHBOARD"],["log","LOGG ØKT"],["programs","PROGRAMMER"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
           ).map(([key,label]) => (
             <button key={key} className={`tab${tab===key?" active":""}`} onClick={() => setTab(key)}>{label}</button>
@@ -1350,6 +1393,178 @@ export default function App() {
                       {prs.map(({dist, time}) => (
                         <div key={dist} className="run-pr-card">
                           <div className="run-pr-label">{dist === 21.1 ? "Halvmaraton" : dist === 42.2 ? "Maraton" : `${dist} km`}</div>
+                          <div className="run-pr-val">{time || "–"}</div>
+                          <div className="run-pr-sub">{time ? "estimert" : "ikke nok data"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            );
+          })()}
+
+          {/* ── SYKKEL ── */}
+          {tab === "cycling" && (() => {
+            const totalKm = rides.reduce((s,r) => s + parseFloat(r.distance), 0);
+            const totalDuration = rides.reduce((s,r) => s + r.duration, 0);
+            const avgSpeed = rides.length ? calcSpeed(totalKm, totalDuration) : null;
+            const longestRide = rides.length ? Math.max(...rides.map(r => parseFloat(r.distance))) : 0;
+
+            const now = new Date();
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - ((now.getDay()+6)%7));
+            monday.setHours(0,0,0,0);
+            const weekRides = rides.filter(r => new Date(r.date_key) >= monday);
+            const weekKm = weekRides.reduce((s,r) => s + parseFloat(r.distance), 0);
+            const weekDuration = weekRides.reduce((s,r) => s + r.duration, 0);
+
+            const monthKey = now.toISOString().slice(0,7);
+            const monthRides = rides.filter(r => r.date_key.startsWith(monthKey));
+            const monthKm = monthRides.reduce((s,r) => s + parseFloat(r.distance), 0);
+
+            const weeklyData = (() => {
+              const weeks = {};
+              rides.forEach(r => {
+                const d = new Date(r.date_key);
+                const mon = new Date(d);
+                mon.setDate(d.getDate() - ((d.getDay()+6)%7));
+                const key = mon.toISOString().slice(5,10);
+                weeks[key] = (weeks[key]||0) + parseFloat(r.distance);
+              });
+              return Object.entries(weeks).sort((a,b)=>a[0]>b[0]?1:-1).slice(-10).map(([date,km])=>({date, km: Math.round(km*10)/10}));
+            })();
+
+            const monthlyData = (() => {
+              const months = {};
+              rides.forEach(r => {
+                const key = r.date_key.slice(0,7);
+                months[key] = (months[key]||0) + parseFloat(r.distance);
+              });
+              return Object.entries(months).sort((a,b)=>a[0]>b[0]?1:-1).slice(-6).map(([date,km])=>({date: date.slice(5), km: Math.round(km*10)/10}));
+            })();
+
+            const prDistances = [20, 40, 100, 160];
+            const prs = prDistances.map(dist => {
+              const eligible = rides.filter(r => parseFloat(r.distance) >= 1);
+              if (!eligible.length) return { dist, time: null };
+              const best = eligible.reduce((b, r) => {
+                const d = parseFloat(r.distance);
+                const predicted = r.duration * Math.pow(dist / d, 1.02);
+                const bDist = parseFloat(b.distance);
+                const bPredicted = b.duration * Math.pow(dist / bDist, 1.02);
+                return predicted < bPredicted ? r : b;
+              });
+              const d = parseFloat(best.distance);
+              const predicted = Math.round(best.duration * Math.pow(dist / d, 1.02));
+              return { dist, time: fmtDuration(predicted) };
+            });
+
+            const recentRides = rides.slice(0, 5);
+
+            return (
+              <>
+                <div className="strava-bar">
+                  {stravaConnected ? (
+                    <>
+                      <span className="strava-status connected">● Strava tilkoblet</span>
+                      <button className="btn-strava" onClick={syncStravaCycling} disabled={cyclingSyncing}>
+                        {cyclingSyncing ? "Synkroniserer..." : "↻ Synk fra Strava"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="strava-status">Ikke koblet til Strava</span>
+                      <button className="btn-strava" onClick={connectStrava}>Koble til Strava</button>
+                    </>
+                  )}
+                  {cyclingMsg && <span className={`strava-msg${cyclingMsg.includes("Feil") ? " err" : ""}`}>{cyclingMsg}</span>}
+                </div>
+
+                {rides.length === 0 ? (
+                  <div className="empty">synk fra Strava for å se statistikk</div>
+                ) : (
+                  <>
+                    <div className="graph-title" style={{marginBottom:"10px"}}>TOTALT</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"24px"}}>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{Math.round(totalKm*10)/10}</div>
+                        <div className="dash-label">Kilometer</div>
+                      </div>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{rides.length}</div>
+                        <div className="dash-label">Turer</div>
+                      </div>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{avgSpeed||"–"}</div>
+                        <div className="dash-label">Snitt fart (km/t)</div>
+                      </div>
+                      <div className="dash-card" style={{padding:"18px 16px"}}>
+                        <div className="dash-num accent">{Math.round(longestRide*10)/10}</div>
+                        <div className="dash-label">Lengste tur (km)</div>
+                      </div>
+                    </div>
+
+                    <div className="graph-title" style={{marginBottom:"10px"}}>DENNE UKEN</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"10px",marginBottom:"24px"}}>
+                      <div className="stat-card"><div className="stat-val">{Math.round(weekKm*10)/10}</div><div className="stat-label">Km</div></div>
+                      <div className="stat-card"><div className="stat-val">{weekRides.length}</div><div className="stat-label">Turer</div></div>
+                      <div className="stat-card"><div className="stat-val">{weekDuration > 0 ? fmtDuration(weekDuration) : "–"}</div><div className="stat-label">Tid</div></div>
+                    </div>
+
+                    <div className="graph-title" style={{marginBottom:"10px"}}>DENNE MÅNEDEN</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"28px"}}>
+                      <div className="stat-card"><div className="stat-val">{Math.round(monthKm*10)/10}</div><div className="stat-label">Km</div></div>
+                      <div className="stat-card"><div className="stat-val">{monthRides.length}</div><div className="stat-label">Turer</div></div>
+                    </div>
+
+                    <div className="graph-section">
+                      <div className="graph-title">Km per uke</div>
+                      <div className="graph-box">
+                        <ResponsiveContainer width="100%" height={160}>
+                          <BarChart data={weeklyData}>
+                            <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={30} />
+                            <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v=>[`${v} km`,"Distanse"]} />
+                            <Bar dataKey="km" fill="#F97316" radius={[2,2,0,0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="graph-section">
+                      <div className="graph-title">Km per måned</div>
+                      <div className="graph-box">
+                        <ResponsiveContainer width="100%" height={160}>
+                          <BarChart data={monthlyData}>
+                            <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={30} />
+                            <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v=>[`${v} km`,"Distanse"]} />
+                            <Bar dataKey="km" fill="#F97316" radius={[2,2,0,0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="graph-title" style={{marginBottom:"12px"}}>SISTE TURER</div>
+                    {recentRides.map(ride => (
+                      <div key={ride.id} className="run-entry">
+                        <div>
+                          <div className="run-dist">{parseFloat(ride.distance).toFixed(1)}</div>
+                          <div className="run-dist-unit">km</div>
+                        </div>
+                        <div className="run-meta">
+                          <div className="run-meta-date">{ride.notes || ride.type}</div>
+                          <div className="run-meta-detail">{ride.date_key} · {fmtDuration(ride.duration)} · {calcSpeed(parseFloat(ride.distance), ride.duration)} km/t</div>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="graph-title" style={{marginTop:"24px",marginBottom:"12px"}}>ESTIMERTE PR-TIDER</div>
+                    <div className="run-pr-grid">
+                      {prs.map(({dist, time}) => (
+                        <div key={dist} className="run-pr-card">
+                          <div className="run-pr-label">{dist} km</div>
                           <div className="run-pr-val">{time || "–"}</div>
                           <div className="run-pr-sub">{time ? "estimert" : "ikke nok data"}</div>
                         </div>
