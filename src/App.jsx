@@ -562,10 +562,12 @@ export default function App() {
   async function saveProgram() {
     if (!progName.trim() || !progExercises.length) return;
     if (editingId) {
-      const { data } = await supabase.from("programs").update({ name: progName, exercises: progExercises }).eq("id", editingId).select().single();
+      const { data, error } = await supabase.from("programs").update({ name: progName, exercises: progExercises }).eq("id", editingId).select().single();
+      if (error) { alert("Feil ved lagring av program: " + error.message); return; }
       if (data) setPrograms(prev => prev.map(p => p.id === editingId ? data : p));
     } else {
-      const { data } = await supabase.from("programs").insert({ user_id: user.id, name: progName, exercises: progExercises }).select().single();
+      const { data, error } = await supabase.from("programs").insert({ user_id: user.id, name: progName, exercises: progExercises }).select().single();
+      if (error) { alert("Feil ved lagring av program: " + error.message); return; }
       if (data) setPrograms(prev => [data, ...prev]);
     }
     setCreatingProgram(false);
@@ -952,6 +954,129 @@ export default function App() {
             </>
           )}
 
+          {/* ── OVERSIKT ── */}
+          {tab === "oversikt" && (
+            <>
+              <div className="subnav">
+                <button className={`subnav-btn${subNav==="history"?" active":""}`} onClick={() => setSubNav("history")}>Historikk</button>
+                <button className={`subnav-btn${subNav==="pr"?" active":""}`} onClick={() => setSubNav("pr")}>PR</button>
+                <button className={`subnav-btn${subNav==="stats"?" active":""}`} onClick={() => setSubNav("stats")}>Statistikk</button>
+              </div>
+
+              {subNav === "history" && (
+                <>
+                  {history.length === 0 ? <div className="empty">ingen økter ennå</div> : history.map(session => (
+                    <div key={session.id} className="history-entry">
+                      <div className="history-header">
+                        <div className="history-date">{session.date}</div>
+                        {session.program_name && <div className="history-count">{session.program_name}</div>}
+                        <div className="history-count">{session.exercises.length} øvelser</div>
+                        {totalVolume(session.exercises) > 0 && (
+                          <div className="history-vol">{totalVolume(session.exercises).toLocaleString("nb-NO")} kg</div>
+                        )}
+                        <button className="btn-icon" onClick={() => deleteSession(session.id)}>🗑</button>
+                      </div>
+                      <div className="history-exercises">
+                        {session.exercises.map((ex, i) => (
+                          <div key={i} className="hist-ex-row">
+                            <div className="hist-ex-name">{ex.name}</div>
+                            <div className="hist-ex-sets">{ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}kg` : ""}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {subNav === "pr" && (
+                <>
+                  {prGroups.length === 0 ? (
+                    <div className="empty">logg økter for å se dine rekorder</div>
+                  ) : prGroups.map(group => (
+                    <div key={group} className="pr-group">
+                      <div className="pr-group-title">{group}</div>
+                      <div className="pr-grid">
+                        {Object.entries(prByGroup[group])
+                          .sort((a, b) => b[1].weight - a[1].weight)
+                          .map(([name, pr]) => (
+                            <div key={name} className="pr-card">
+                              <div className="pr-exercise">{name}</div>
+                              <div>
+                                <span className="pr-weight">{pr.weight > 0 ? pr.weight : "–"}</span>
+                                {pr.weight > 0 && <span className="pr-weight-unit">kg</span>}
+                              </div>
+                              {pr.sets && pr.reps && <div className="pr-detail">{pr.sets}×{pr.reps} reps</div>}
+                              <div className="pr-detail">{pr.date}</div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {subNav === "stats" && (
+                <>
+                  <div className="stats-grid">
+                    <div className="stat-card"><div className="stat-val">{totalSessions}</div><div className="stat-label">Totale økter</div></div>
+                    <div className="stat-card"><div className="stat-val">{totalExCount}</div><div className="stat-label">Øvelser logget</div></div>
+                    <div className="stat-card"><div className="stat-val">{programs.length}</div><div className="stat-label">Programmer</div></div>
+                  </div>
+                  <div className="graph-section">
+                    <div className="graph-title">Totalvolum per økt (siste 20)</div>
+                    {volumeGraphData.length > 0 ? (
+                      <div className="graph-box">
+                        <ResponsiveContainer width="100%" height={180}>
+                          <BarChart data={volumeGraphData}>
+                            <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={50} />
+                            <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v => [`${v.toLocaleString("nb-NO")} kg`,"Volum"]} />
+                            <Bar dataKey="volum" fill="#F97316" radius={[2,2,0,0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : <div className="graph-empty">logg flere økter for å se graf</div>}
+                  </div>
+                  <div className="graph-section">
+                    <div className="graph-title">Vektfremgang per øvelse</div>
+                    <div className="field ex-selector">
+                      <label>Velg øvelse</label>
+                      <select value={selectedExercise} onChange={e => setSelectedExercise(e.target.value)}>
+                        <option value="">— Velg øvelse —</option>
+                        {allExerciseNames.map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </div>
+                    {selectedExercise && exerciseGraphData.length > 0 ? (
+                      <div className="graph-box">
+                        <ResponsiveContainer width="100%" height={180}>
+                          <LineChart data={exerciseGraphData}>
+                            <XAxis dataKey="date" tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                            <YAxis tick={{fill:"var(--muted)",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={40} />
+                            <Tooltip contentStyle={{background:"var(--surface)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v => [`${v} kg`,"Vekt"]} />
+                            <Line type="monotone" dataKey="vekt" stroke="#F97316" strokeWidth={2} dot={{fill:"#F97316",r:3}} activeDot={{r:5}} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : selectedExercise ? (
+                      <div className="graph-empty">logg flere økter med {selectedExercise} for å se fremgang</div>
+                    ) : null}
+                  </div>
+                  {topExercises.length > 0 ? (
+                    <div>
+                      <div className="top-list-title">Mest trente øvelser</div>
+                      {topExercises.map(([name, count], i) => (
+                        <div key={name} className="top-row">
+                          <div className="top-rank">{i+1}</div>
+                          <div className="top-name">{name}</div>
+                          <div className="top-count">{count}×</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <div className="empty">logg noen økter for å se statistikk</div>}
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
