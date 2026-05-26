@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "./supabase";
 
 const ACCENT = "#F97316";
 const BG = "#0A0A0A";
@@ -132,6 +133,21 @@ const styles = `
   .load-banner { background: #1a1a1a; border: 1px solid #F97316; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; animation: slideIn .2s ease; }
   .load-banner-text { font-family: 'DM Mono', monospace; font-size: .7rem; color: #F97316; letter-spacing: 1px; flex: 1; }
   .divider { border: none; border-top: 1px solid #222; margin: 20px 0; }
+
+  /* AUTH */
+  .auth-screen { min-height: 100vh; background: #0A0A0A; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-box { width: 100%; max-width: 400px; }
+  .auth-title { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; letter-spacing: 3px; margin-bottom: 4px; }
+  .auth-title span { color: #F97316; }
+  .auth-sub { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: #666; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 40px; }
+  .auth-form { display: flex; flex-direction: column; gap: 14px; }
+  .auth-error { font-family: 'DM Mono', monospace; font-size: .75rem; color: #e53e3e; letter-spacing: 1px; padding: 10px 14px; border: 1px solid #e53e3e; background: #1a0a0a; }
+  .auth-success { font-family: 'DM Mono', monospace; font-size: .75rem; color: #4caf50; letter-spacing: 1px; padding: 10px 14px; border: 1px solid #4caf50; background: #0a1a0a; }
+  .auth-toggle { margin-top: 20px; font-family: 'DM Mono', monospace; font-size: .7rem; color: #666; letter-spacing: 1px; }
+  .auth-toggle button { background: none; border: none; color: #F97316; cursor: pointer; font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: 1px; text-decoration: underline; padding: 0; margin-left: 6px; }
+  .btn-logout { background: none; border: 1px solid #333; color: #666; font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; padding: 6px 12px; cursor: pointer; transition: all .15s; }
+  .btn-logout:hover { border-color: #e53e3e; color: #e53e3e; }
+  .user-email { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: #444; letter-spacing: 1px; }
 `;
 
 const EXERCISES_BY_GROUP = {
@@ -158,7 +174,6 @@ function totalVolume(exs) {
   return exs.reduce((sum,e) => sum + (parseFloat(e.sets)||0)*(parseFloat(e.reps)||0)*(parseFloat(e.weight)||0), 0);
 }
 
-// Shared exercise picker + number inputs
 function ExerciseForm({ form, setForm, onAdd }) {
   const repsRef = React.useRef(null);
   const weightRef = React.useRef(null);
@@ -218,14 +233,71 @@ function ExerciseForm({ form, setForm, onAdd }) {
   );
 }
 
+function AuthScreen() {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setError(error.message);
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) setError(error.message);
+      else setSuccess("Sjekk e-posten din og bekreft kontoen!");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-box">
+        <div className="auth-title">IRON<span>LOG</span></div>
+        <div className="auth-sub">{mode === "login" ? "Logg inn for å fortsette" : "Opprett konto"}</div>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="field">
+            <label>E-post</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="deg@epost.no" required />
+          </div>
+          <div className="field">
+            <label>Passord</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} />
+          </div>
+          {error && <div className="auth-error">{error}</div>}
+          {success && <div className="auth-success">{success}</div>}
+          <button type="submit" className="btn-orange" disabled={loading} style={{padding:"14px",fontSize:"1.2rem"}}>
+            {loading ? "Venter..." : mode === "login" ? "LOGG INN" : "OPPRETT KONTO"}
+          </button>
+        </form>
+        <div className="auth-toggle">
+          {mode === "login" ? "Har du ikke konto?" : "Har du allerede konto?"}
+          <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); setSuccess(""); }}>
+            {mode === "login" ? "Registrer deg" : "Logg inn"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState("dashboard");
   const [clock, setClock] = useState(new Date());
   useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);
 
   // Rest timer
   const [timerActive, setTimerActive] = useState(false);
-  const [timerDuration, setTimerDuration] = useState(120); // seconds, default 2 min
+  const [timerDuration, setTimerDuration] = useState(120);
   const [timerRemaining, setTimerRemaining] = useState(120);
   const timerRef = useState(null);
   useEffect(() => {
@@ -248,17 +320,14 @@ export default function App() {
   }
   function fmtTime(s) { return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0"); }
 
-
   // Log state
   const [exercises, setExercises] = useState([]);
   const [logForm, setLogForm] = useState(EMPTY_FORM);
   const [saved, setSaved] = useState(false);
   const [loadedProgram, setLoadedProgram] = useState(null);
 
-  // History
+  // History & programs
   const [history, setHistory] = useState([]);
-
-  // Programs state
   const [programs, setPrograms] = useState([]);
   const [creatingProgram, setCreatingProgram] = useState(false);
   const [progName, setProgName] = useState("");
@@ -267,25 +336,34 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [progSaved, setProgSaved] = useState(false);
 
-  // Load from localStorage
+  // Auth
   useEffect(() => {
-    try {
-      const h = localStorage.getItem("ironlog-history");
-      if (h) setHistory(JSON.parse(h));
-    } catch {}
-    try {
-      const p = localStorage.getItem("ironlog-programs");
-      if (p) setPrograms(JSON.parse(p));
-    } catch {}
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const saveHistory = useCallback((data) => {
-    try { localStorage.setItem("ironlog-history", JSON.stringify(data)); } catch {}
-  }, []);
+  // Load data when user logs in
+  useEffect(() => {
+    if (!user) { setHistory([]); setPrograms([]); return; }
+    loadHistory();
+    loadPrograms();
+  }, [user]);
 
-  const savePrograms = useCallback((data) => {
-    try { localStorage.setItem("ironlog-programs", JSON.stringify(data)); } catch {}
-  }, []);
+  async function loadHistory() {
+    const { data } = await supabase.from("sessions").select("*").order("created_at", { ascending: false });
+    if (data) setHistory(data);
+  }
+
+  async function loadPrograms() {
+    const { data } = await supabase.from("programs").select("*").order("created_at", { ascending: false });
+    if (data) setPrograms(data);
+  }
 
   // --- LOG ---
   function addLogExercise() {
@@ -296,16 +374,25 @@ export default function App() {
     startTimer();
   }
 
-  function saveSession() {
+  async function saveSession() {
     if (!exercises.length) return;
-    const session = { id: Date.now(), date: today(), dateKey: todayKey(), exercises, programName: loadedProgram };
-    const newHistory = [session, ...history];
-    setHistory(newHistory);
-    saveHistory(newHistory);
+    const { data } = await supabase.from("sessions").insert({
+      user_id: user.id,
+      date: today(),
+      date_key: todayKey(),
+      exercises,
+      program_name: loadedProgram,
+    }).select().single();
+    if (data) setHistory(prev => [data, ...prev]);
     setExercises([]);
     setLoadedProgram(null);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  async function deleteSession(id) {
+    await supabase.from("sessions").delete().eq("id", id);
+    setHistory(prev => prev.filter(s => s.id !== id));
   }
 
   function loadProgram(program) {
@@ -323,16 +410,15 @@ export default function App() {
     setProgForm(f => ({ ...f, sets: "", reps: "", weight: "", customName: "" }));
   }
 
-  function saveProgram() {
+  async function saveProgram() {
     if (!progName.trim() || !progExercises.length) return;
-    let newPrograms;
     if (editingId) {
-      newPrograms = programs.map(p => p.id === editingId ? { ...p, name: progName, exercises: progExercises } : p);
+      const { data } = await supabase.from("programs").update({ name: progName, exercises: progExercises }).eq("id", editingId).select().single();
+      if (data) setPrograms(prev => prev.map(p => p.id === editingId ? data : p));
     } else {
-      newPrograms = [...programs, { id: Date.now(), name: progName, exercises: progExercises }];
+      const { data } = await supabase.from("programs").insert({ user_id: user.id, name: progName, exercises: progExercises }).select().single();
+      if (data) setPrograms(prev => [data, ...prev]);
     }
-    setPrograms(newPrograms);
-    savePrograms(newPrograms);
     setCreatingProgram(false);
     setEditingId(null);
     setProgName("");
@@ -342,10 +428,9 @@ export default function App() {
     setTimeout(() => setProgSaved(false), 2500);
   }
 
-  function deleteProgram(id) {
-    const n = programs.filter(p => p.id !== id);
-    setPrograms(n);
-    savePrograms(n);
+  async function deleteProgram(id) {
+    await supabase.from("programs").delete().eq("id", id);
+    setPrograms(prev => prev.filter(p => p.id !== id));
   }
 
   function startEdit(program) {
@@ -371,6 +456,26 @@ export default function App() {
   history.forEach(sess => sess.exercises.forEach(e => { exFreq[e.name] = (exFreq[e.name]||0)+1; }));
   const topExercises = Object.entries(exFreq).sort((a,b) => b[1]-a[1]).slice(0,5);
 
+  if (authLoading) {
+    return (
+      <>
+        <style>{styles}</style>
+        <div style={{minHeight:"100vh",background:"#0A0A0A",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:".8rem",color:"#444",letterSpacing:"2px"}}>LASTER...</div>
+        </div>
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <style>{styles}</style>
+        <AuthScreen />
+      </>
+    );
+  }
+
   return (
     <>
       <style>{styles}</style>
@@ -379,6 +484,10 @@ export default function App() {
           <h1>IRON<span style={{color:ACCENT}}>LOG</span></h1>
           <span className="header-date">{todayKey()}</span>
           <div className="header-dot" />
+          <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"10px"}}>
+            <span className="user-email">{user.email}</span>
+            <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Logg ut</button>
+          </div>
         </div>
 
         <div className="tabs">
@@ -397,25 +506,21 @@ export default function App() {
             const ss = String(now.getSeconds()).padStart(2,"0");
             const fullDate = now.toLocaleDateString("nb-NO", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
 
-            // Sessions last 7 days
             const oneWeekAgo = new Date(now); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-            const sessionsThisWeek = history.filter(s => new Date(s.dateKey) >= oneWeekAgo).length;
+            const sessionsThisWeek = history.filter(s => new Date(s.date_key) >= oneWeekAgo).length;
 
-            // Days since last session
             const lastSession = history[0];
             let daysSince = null;
             if (lastSession) {
-              const diff = now - new Date(lastSession.dateKey);
+              const diff = now - new Date(lastSession.date_key);
               daysSince = Math.floor(diff / (1000*60*60*24));
             }
 
-            // Muscle groups from last session
             const lastGroups = lastSession
               ? [...new Set(lastSession.exercises.map(e => e.group).filter(Boolean))]
               : [];
 
-            // Streak: consecutive days with a session
-            const sessionDays = new Set(history.map(s => s.dateKey));
+            const sessionDays = new Set(history.map(s => s.date_key));
             let streak = 0;
             const check = new Date(now);
             while (true) {
@@ -433,7 +538,7 @@ export default function App() {
                   <div className="dash-card">
                     <div className="dash-num accent">{sessionsThisWeek}</div>
                     <div className="dash-label">Økter siste 7 dager</div>
-                    <div className="dash-sub">{sessionsThisWeek === 0 ? "Ingen økter denne uken" : sessionsThisWeek === 1 ? "Bra start!" : sessionsThisWeek >= 4 ? "Imponerende! 💪" : "Bra jobba!"}</div>
+                    <div className="dash-sub">{sessionsThisWeek === 0 ? "Ingen økter denne uken" : sessionsThisWeek === 1 ? "Bra start!" : sessionsThisWeek >= 4 ? "Imponerende!" : "Bra jobba!"}</div>
                   </div>
 
                   <div className="dash-card green">
@@ -453,7 +558,7 @@ export default function App() {
                     )}
                     {lastSession && (
                       <div className="dash-sub" style={{marginTop:"10px"}}>
-                        {lastSession.exercises.length} øvelser · {lastSession.programName ? lastSession.programName : lastSession.date}
+                        {lastSession.exercises.length} øvelser · {lastSession.program_name ? lastSession.program_name : lastSession.date}
                       </div>
                     )}
                   </div>
@@ -478,7 +583,7 @@ export default function App() {
                   <div className="field" style={{minWidth:"200px"}}>
                     <label>Last program</label>
                     <select defaultValue="" onChange={e => {
-                      const p = programs.find(x => x.id === parseInt(e.target.value));
+                      const p = programs.find(x => x.id === e.target.value);
                       if (p) loadProgram(p);
                     }}>
                       <option value="" disabled>Velg program...</option>
@@ -553,14 +658,12 @@ export default function App() {
               </div>
 
               {creatingProgram && (
-                <div className={`new-program-form active`} style={{marginBottom:"24px"}}>
+                <div className="new-program-form active" style={{marginBottom:"24px"}}>
                   <div className="field program-name-input">
                     <label>Programnavn</label>
                     <input value={progName} onChange={e => setProgName(e.target.value)} placeholder='f.eks. "Push dag A"' />
                   </div>
-
                   <ExerciseForm form={progForm} setForm={setProgForm} onAdd={addProgExercise} />
-
                   {progExercises.length > 0 && (
                     <div style={{marginTop:"12px",marginBottom:"12px"}}>
                       {progExercises.map(ex => (
@@ -574,7 +677,6 @@ export default function App() {
                       ))}
                     </div>
                   )}
-
                   <div className="save-row">
                     <button className="btn-outline" onClick={saveProgram} disabled={!progName.trim()||!progExercises.length}>
                       {editingId ? "OPPDATER" : "LAGRE PROGRAM"}
@@ -626,15 +728,12 @@ export default function App() {
                 <div key={session.id} className="history-entry">
                   <div className="history-header">
                     <div className="history-date">{session.date}</div>
-                    {session.programName && <div className="history-count">{session.programName}</div>}
+                    {session.program_name && <div className="history-count">{session.program_name}</div>}
                     <div className="history-count">{session.exercises.length} øvelser</div>
                     {totalVolume(session.exercises) > 0 && (
                       <div className="history-vol">{totalVolume(session.exercises).toLocaleString("nb-NO")} kg</div>
                     )}
-                    <button className="btn-icon" onClick={() => {
-                      const n = history.filter(s => s.id !== session.id);
-                      setHistory(n); saveHistory(n);
-                    }}>🗑</button>
+                    <button className="btn-icon" onClick={() => deleteSession(session.id)}>🗑</button>
                   </div>
                   <div className="history-exercises">
                     {session.exercises.map((ex, i) => (
