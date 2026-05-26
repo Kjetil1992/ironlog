@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
 const ACCENT = "#F97316";
 const BG = "#0A0A0A";
@@ -111,6 +112,13 @@ const styles = `
   .top-rank { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; color: #666; width: 20px; }
   .top-name { flex: 1; font-size: .9rem; }
   .top-count { font-family: 'DM Mono', monospace; font-size: .75rem; color: #F97316; }
+
+  /* GRAPHS */
+  .graph-section { margin-bottom: 32px; }
+  .graph-title { font-family: 'DM Mono', monospace; font-size: .65rem; letter-spacing: 3px; text-transform: uppercase; color: #666; margin-bottom: 12px; }
+  .graph-box { background: #141414; border: 1px solid #222; padding: 20px 12px 8px 4px; }
+  .graph-empty { background: #141414; border: 1px solid #222; padding: 40px; text-align: center; font-family: 'DM Mono', monospace; font-size: .7rem; color: #444; letter-spacing: 2px; text-transform: uppercase; }
+  .ex-selector { margin-bottom: 16px; }
 
   /* PROGRAMS */
   .program-card { border: 1px solid #222; background: #141414; margin-bottom: 16px; overflow: hidden; }
@@ -450,11 +458,29 @@ export default function App() {
   }
 
   // Stats
+  const [selectedExercise, setSelectedExercise] = useState("");
   const totalSessions = history.length;
   const totalExCount = history.reduce((s,sess) => s + sess.exercises.length, 0);
   const exFreq = {};
   history.forEach(sess => sess.exercises.forEach(e => { exFreq[e.name] = (exFreq[e.name]||0)+1; }));
   const topExercises = Object.entries(exFreq).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const allExerciseNames = [...new Set(history.flatMap(s => s.exercises.map(e => e.name)))].sort();
+
+  const exerciseGraphData = [...history].reverse()
+    .filter(s => s.exercises.some(e => e.name === selectedExercise))
+    .map(s => {
+      const ex = s.exercises.find(e => e.name === selectedExercise);
+      return {
+        date: s.date_key.slice(5),
+        vekt: parseFloat(ex.weight) || 0,
+        volum: Math.round((parseFloat(ex.sets)||0) * (parseFloat(ex.reps)||0) * (parseFloat(ex.weight)||0)),
+      };
+    });
+
+  const volumeGraphData = [...history].reverse().slice(-20).map(s => ({
+    date: s.date_key.slice(5),
+    volum: Math.round(totalVolume(s.exercises)),
+  }));
 
   if (authLoading) {
     return (
@@ -756,6 +782,52 @@ export default function App() {
                 <div className="stat-card"><div className="stat-val">{totalExCount}</div><div className="stat-label">Øvelser logget</div></div>
                 <div className="stat-card"><div className="stat-val">{programs.length}</div><div className="stat-label">Programmer</div></div>
               </div>
+
+              {/* Totalvolum per økt */}
+              <div className="graph-section">
+                <div className="graph-title">Totalvolum per økt (siste 20)</div>
+                {volumeGraphData.length > 1 ? (
+                  <div className="graph-box">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={volumeGraphData}>
+                        <XAxis dataKey="date" tick={{fill:"#444",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fill:"#444",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={50} />
+                        <Tooltip contentStyle={{background:"#141414",border:"1px solid #333",color:"#F5F5F0",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v => [`${v.toLocaleString("nb-NO")} kg`,"Volum"]} />
+                        <Bar dataKey="volum" fill="#F97316" radius={[2,2,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="graph-empty">logg flere økter for å se graf</div>
+                )}
+              </div>
+
+              {/* Fremgang per øvelse */}
+              <div className="graph-section">
+                <div className="graph-title">Vektfremgang per øvelse</div>
+                <div className="field ex-selector">
+                  <label>Velg øvelse</label>
+                  <select value={selectedExercise} onChange={e => setSelectedExercise(e.target.value)}>
+                    <option value="">— Velg øvelse —</option>
+                    {allExerciseNames.map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                {selectedExercise && exerciseGraphData.length > 1 ? (
+                  <div className="graph-box">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart data={exerciseGraphData}>
+                        <XAxis dataKey="date" tick={{fill:"#444",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fill:"#444",fontSize:10,fontFamily:"DM Mono"}} axisLine={false} tickLine={false} width={40} />
+                        <Tooltip contentStyle={{background:"#141414",border:"1px solid #333",color:"#F5F5F0",fontFamily:"DM Mono",fontSize:"0.75rem"}} formatter={v => [`${v} kg`,"Vekt"]} />
+                        <Line type="monotone" dataKey="vekt" stroke="#F97316" strokeWidth={2} dot={{fill:"#F97316",r:3}} activeDot={{r:5}} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : selectedExercise ? (
+                  <div className="graph-empty">logg flere økter med {selectedExercise} for å se fremgang</div>
+                ) : null}
+              </div>
+
               {topExercises.length > 0 ? (
                 <div>
                   <div className="top-list-title">Mest trente øvelser</div>
