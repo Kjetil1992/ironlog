@@ -787,7 +787,7 @@ export default function App() {
               {/* Totalvolum per økt */}
               <div className="graph-section">
                 <div className="graph-title">Totalvolum per økt (siste 20)</div>
-                {volumeGraphData.length > 1 ? (
+                {volumeGraphData.length > 0 ? (
                   <div className="graph-box">
                     <ResponsiveContainer width="100%" height={180}>
                       <BarChart data={volumeGraphData}>
@@ -813,7 +813,7 @@ export default function App() {
                     {allExerciseNames.map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
-                {selectedExercise && exerciseGraphData.length > 1 ? (
+                {selectedExercise && exerciseGraphData.length > 0 ? (
                   <div className="graph-box">
                     <ResponsiveContainer width="100%" height={180}>
                       <LineChart data={exerciseGraphData}>
