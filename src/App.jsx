@@ -9,6 +9,10 @@ const LIGHT_PALETTES = {
   skifer:   { bg: "#E4E9EF", surface: "#F0F4F8", surface2: "#D8DFE8", border: "#C4CDD8", border2: "#AEBBC8" },
   salvie:   { bg: "#E4EDE6", surface: "#F0F6F1", surface2: "#D4E2D8", border: "#BCCFC2", border2: "#A4BCAC" },
   lavendel: { bg: "#EAE6F0", surface: "#F4F1F8", surface2: "#DDD8E8", border: "#C8C0D8", border2: "#B0A8C8" },
+  kobolt:   { bg: "#B8CCE4", surface: "#D0E2F4", surface2: "#A0B8D4", border: "#88A8C8", border2: "#6890B4" },
+  mynte:    { bg: "#A8D4BE", surface: "#C4E8D4", surface2: "#8CC4A8", border: "#6CAE90", border2: "#4E9878" },
+  rose:     { bg: "#ECC0CC", surface: "#F8D4DC", surface2: "#DCA8B8", border: "#CC8CA0", border2: "#BC7090" },
+  gull:     { bg: "#E8C870", surface: "#F4DC98", surface2: "#D8B450", border: "#C8A030", border2: "#B88C18" },
 };
 
 function themeVars(dark, palette = "krem") {
@@ -602,7 +606,7 @@ export default function App() {
                 <div className="settings-section">
                   <div className="settings-label">Fargepalett</div>
                   <div className="palette-grid">
-                    {Object.entries({krem:"#F0ECE4", skifer:"#E4E9EF", salvie:"#E4EDE6", lavendel:"#EAE6F0"}).map(([name, color]) => (
+                    {Object.entries({krem:"#F0ECE4", skifer:"#E4E9EF", salvie:"#E4EDE6", lavendel:"#EAE6F0", kobolt:"#B8CCE4", mynte:"#A8D4BE", rose:"#ECC0CC", gull:"#E8C870"}).map(([name, color]) => (
                       <div key={name}>
                         <button className={`palette-swatch${lightPalette===name?" active":""}`}
                           style={{background:color, width:"100%"}}
