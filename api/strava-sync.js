@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+const { createClient } = require('@supabase/supabase-js')
 
 function stravaType(a) {
   if (a.sport_type === 'TrailRun') return 'Terreng'
@@ -12,7 +12,7 @@ function fmtDate(isoLocal) {
   return d.toLocaleDateString('nb-NO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const { user_id } = req.query
   if (!user_id) return res.status(400).json({ error: 'Missing user_id' })
 
@@ -31,7 +31,6 @@ export default async function handler(req, res) {
 
   let accessToken = tokenData.access_token
 
-  // Refresh token if expiring within 5 minutes
   if (Math.floor(Date.now() / 1000) > tokenData.expires_at - 300) {
     const refreshRes = await fetch('https://www.strava.com/oauth/token', {
       method: 'POST',
@@ -55,7 +54,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Fetch run activities from Strava (last 100)
   const activitiesRes = await fetch(
     'https://www.strava.com/api/v3/athlete/activities?per_page=100',
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -63,14 +61,13 @@ export default async function handler(req, res) {
   const activities = await activitiesRes.json()
 
   if (!Array.isArray(activities)) {
-    return res.status(500).json({ error: 'Failed to fetch activities' })
+    return res.status(500).json({ error: 'Failed to fetch activities', detail: activities })
   }
 
   const runActivities = activities.filter(a =>
     a.sport_type === 'Run' || a.sport_type === 'TrailRun' || a.sport_type === 'VirtualRun'
   )
 
-  // Get existing strava_ids to avoid duplicates
   const { data: existing } = await supabase
     .from('runs')
     .select('strava_id')
