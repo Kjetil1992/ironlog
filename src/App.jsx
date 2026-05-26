@@ -384,14 +384,15 @@ export default function App() {
 
   async function saveSession() {
     if (!exercises.length) return;
-    const { data } = await supabase.from("sessions").insert({
+    const { data, error } = await supabase.from("sessions").insert({
       user_id: user.id,
       date: today(),
       date_key: todayKey(),
       exercises,
       program_name: loadedProgram,
     }).select().single();
-    if (data) setHistory(prev => [data, ...prev]);
+    if (error) { alert("Feil ved lagring: " + error.message); return; }
+    await loadHistory();
     setExercises([]);
     setLoadedProgram(null);
     setSaved(true);
