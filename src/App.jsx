@@ -451,10 +451,7 @@ export default function App() {
   }
 
   function connectStrava() {
-    const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/api/strava-callback`;
-    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=activity:read_all&state=${user.id}`;
-    window.location.href = url;
+    window.location.href = `/api/strava-auth?user_id=${user.id}`;
   }
 
   async function syncStrava() {
