@@ -240,6 +240,25 @@ const styles = `
   .palette-swatch.active { border-color: #F97316; transform: scale(1.1); }
   .palette-name { font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); text-align: center; margin-top: 6px; }
 
+  /* LANDING */
+  .landing { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+  .landing-header { padding: 32px 28px 0; display: flex; align-items: center; justify-content: space-between; }
+  .landing-logo { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; letter-spacing: 2px; }
+  .landing-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; }
+  .landing-greeting { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; text-align: center; }
+  .landing-question { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 2px; margin-bottom: 40px; text-align: center; }
+  .landing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 500px; }
+  @media (max-width: 460px) { .landing-grid { grid-template-columns: 1fr; max-width: 300px; } }
+  .landing-card { position: relative; border: 1px solid var(--border); background: var(--surface); padding: 44px 28px 36px; cursor: pointer; transition: all .2s; overflow: hidden; text-align: left; }
+  .landing-card:hover { border-color: #F97316; transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+  .landing-card-icon { font-size: 2.8rem; margin-bottom: 20px; line-height: 1; display: block; }
+  .landing-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 3px; margin-bottom: 8px; display: block; }
+  .landing-card-sub { font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); display: block; }
+  .landing-card-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #F97316; transform: scaleX(0); transition: transform .25s ease; transform-origin: left; }
+  .landing-card:hover .landing-card-bar { transform: scaleX(1); }
+  .landing-card-arrow { position: absolute; top: 20px; right: 20px; font-size: 1.2rem; color: var(--border2); transition: color .2s; }
+  .landing-card:hover .landing-card-arrow { color: #F97316; }
+
   /* AUTH */
   .auth-screen { min-height: 100vh; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
   .auth-box { width: 100%; max-width: 400px; }
@@ -405,6 +424,7 @@ export default function App() {
   }
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [section, setSection] = useState(null);
   const [tab, setTab] = useState("dashboard");
   const [subNav, setSubNav] = useState("history");
   const [runSubNav, setRunSubNav] = useState("log");
@@ -726,6 +746,78 @@ export default function App() {
     );
   }
 
+  if (!section) {
+    return (
+      <>
+        <style>{themeVars(darkMode, lightPalette) + styles}</style>
+        <div className="landing">
+          <div className="landing-header">
+            <div className="landing-logo">IRON<span style={{color:ACCENT}}>LOG</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+              <button className="btn-settings" onClick={() => setShowSettings(true)} title="Innstillinger">⚙</button>
+            </div>
+          </div>
+          {showSettings && (
+            <>
+              <div className="settings-overlay" onClick={() => setShowSettings(false)} />
+              <div className="settings-panel">
+                <div className="settings-header">
+                  <div className="settings-title">INNSTILLINGER</div>
+                  <button className="settings-close" onClick={() => setShowSettings(false)}>✕</button>
+                </div>
+                <div className="settings-section">
+                  <div className="settings-label">Tema</div>
+                  <div className="theme-toggle">
+                    <button className={`theme-btn${darkMode ? " active" : ""}`} onClick={() => { setDarkMode(true); localStorage.setItem("ironlog-theme","dark"); }}>🌙 Mørk</button>
+                    <button className={`theme-btn${!darkMode ? " active" : ""}`} onClick={() => { setDarkMode(false); localStorage.setItem("ironlog-theme","light"); }}>☀ Lys</button>
+                  </div>
+                </div>
+                {!darkMode && (
+                  <div className="settings-section">
+                    <div className="settings-label">Fargepalett</div>
+                    <div className="palette-grid">
+                      {Object.entries({krem:"#F0ECE4", skifer:"#E4E9EF", salvie:"#E4EDE6", lavendel:"#EAE6F0", kobolt:"#B8CCE4", mynte:"#A8D4BE", rose:"#ECC0CC", gull:"#E8C870"}).map(([name, color]) => (
+                        <div key={name}>
+                          <button className={`palette-swatch${lightPalette===name?" active":""}`} style={{background:color, width:"100%"}} onClick={() => setPalette(name)} />
+                          <div className="palette-name">{name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={{marginTop:"auto"}}>
+                  <div className="settings-label">Konto</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginBottom:"12px"}}>{user.email}</div>
+                  <button className="btn-ghost" style={{width:"100%"}} onClick={() => supabase.auth.signOut()}>Logg ut</button>
+                </div>
+              </div>
+            </>
+          )}
+          <div className="landing-body">
+            <div className="landing-greeting">Hva trener du i dag?</div>
+            <div className="landing-question">VELG AKTIVITET</div>
+            <div className="landing-grid">
+              <button className="landing-card" onClick={() => { setSection("styrke"); setTab("dashboard"); }}>
+                <span className="landing-card-arrow">→</span>
+                <span className="landing-card-icon">🏋️</span>
+                <span className="landing-card-title">STYRKE</span>
+                <span className="landing-card-sub">Logg økt · programmer · PR</span>
+                <div className="landing-card-bar" />
+              </button>
+              <button className="landing-card" onClick={() => { setSection("løping"); setTab("running"); }}>
+                <span className="landing-card-arrow">→</span>
+                <span className="landing-card-icon">🏃</span>
+                <span className="landing-card-title">LØPING</span>
+                <span className="landing-card-sub">Logg tur · historikk · stats</span>
+                <div className="landing-card-bar" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <style>{themeVars(darkMode, lightPalette) + styles}</style>
@@ -773,8 +865,11 @@ export default function App() {
         )}
 
         <div className="header">
-          <h1>IRON<span style={{color:ACCENT}}>LOG</span></h1>
-          <span className="header-date">{todayKey()}</span>
+          <button onClick={() => setSection(null)} style={{background:"none",border:"none",cursor:"pointer",padding:0,lineHeight:1}}>
+            <h1>IRON<span style={{color:ACCENT}}>LOG</span></h1>
+          </button>
+          <span style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"2px",textTransform:"uppercase",background:"var(--surface2)",border:"1px solid var(--border)",padding:"2px 8px",marginLeft:"4px"}}>{section === "løping" ? "LØPING" : "STYRKE"}</span>
+          <span className="header-date" style={{marginLeft:"8px"}}>{todayKey()}</span>
           <div className="header-dot" />
           <div style={{marginLeft:"12px",display:"flex",alignItems:"center",gap:"8px"}}>
             <button onClick={() => setTab("profile")} title="Profil" style={{
@@ -791,7 +886,10 @@ export default function App() {
         </div>
 
         <div className="tabs">
-          {[["dashboard","DASHBOARD"],["log","LOGG ØKT"],["programs","PROGRAMMER"],["running","LØPING"],["oversikt","OVERSIKT"]].map(([key,label]) => (
+          {(section === "løping"
+            ? [["running","LOGG"],["profile","PROFIL"]]
+            : [["dashboard","DASHBOARD"],["log","LOGG ØKT"],["programs","PROGRAMMER"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
+          ).map(([key,label]) => (
             <button key={key} className={`tab${tab===key?" active":""}`} onClick={() => setTab(key)}>{label}</button>
           ))}
         </div>
