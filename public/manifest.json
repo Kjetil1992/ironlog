@@ -1,6 +1,6 @@
 {
-  "name": "IronLog – Treningssporing",
-  "short_name": "IronLog",
+  "name": "Pulse – Treningssporing",
+  "short_name": "Pulse",
   "description": "Spor treningsøktene dine",
   "start_url": "/",
   "display": "standalone",

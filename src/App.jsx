@@ -395,7 +395,7 @@ function AuthScreen() {
   return (
     <div className="auth-screen">
       <div className="auth-box">
-        <div className="auth-title">IRON<span>LOG</span></div>
+        <div className="auth-title">PUL<span>SE</span></div>
         <div className="auth-sub">{mode === "login" ? "Logg inn for å fortsette" : "Opprett konto"}</div>
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="field">
@@ -424,13 +424,13 @@ function AuthScreen() {
 }
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("ironlog-theme") !== "light");
-  const [lightPalette, setLightPalette] = useState(() => localStorage.getItem("ironlog-palette") || "krem");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("pulse-theme") !== "light");
+  const [lightPalette, setLightPalette] = useState(() => localStorage.getItem("pulse-palette") || "krem");
   const [showSettings, setShowSettings] = useState(false);
 
   function setPalette(p) {
     setLightPalette(p);
-    localStorage.setItem("ironlog-palette", p);
+    localStorage.setItem("pulse-palette", p);
   }
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -813,7 +813,7 @@ export default function App() {
         <style>{themeVars(darkMode, lightPalette) + styles}</style>
         <div className="landing">
           <div className="landing-header">
-            <div className="landing-logo">IRON<span style={{color:ACCENT}}>LOG</span></div>
+            <div className="landing-logo">PUL<span style={{color:ACCENT}}>SE</span></div>
             <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
               <button className="btn-settings" onClick={() => setShowSettings(true)} title="Innstillinger">⚙</button>
             </div>
@@ -829,8 +829,8 @@ export default function App() {
                 <div className="settings-section">
                   <div className="settings-label">Tema</div>
                   <div className="theme-toggle">
-                    <button className={`theme-btn${darkMode ? " active" : ""}`} onClick={() => { setDarkMode(true); localStorage.setItem("ironlog-theme","dark"); }}>🌙 Mørk</button>
-                    <button className={`theme-btn${!darkMode ? " active" : ""}`} onClick={() => { setDarkMode(false); localStorage.setItem("ironlog-theme","light"); }}>☀ Lys</button>
+                    <button className={`theme-btn${darkMode ? " active" : ""}`} onClick={() => { setDarkMode(true); localStorage.setItem("pulse-theme","dark"); }}>🌙 Mørk</button>
+                    <button className={`theme-btn${!darkMode ? " active" : ""}`} onClick={() => { setDarkMode(false); localStorage.setItem("pulse-theme","light"); }}>☀ Lys</button>
                   </div>
                 </div>
                 {!darkMode && (
@@ -897,8 +897,8 @@ export default function App() {
               <div className="settings-section">
                 <div className="settings-label">Tema</div>
                 <div className="theme-toggle">
-                  <button className={`theme-btn${darkMode ? " active" : ""}`} onClick={() => { setDarkMode(true); localStorage.setItem("ironlog-theme","dark"); }}>🌙 Mørk</button>
-                  <button className={`theme-btn${!darkMode ? " active" : ""}`} onClick={() => { setDarkMode(false); localStorage.setItem("ironlog-theme","light"); }}>☀ Lys</button>
+                  <button className={`theme-btn${darkMode ? " active" : ""}`} onClick={() => { setDarkMode(true); localStorage.setItem("pulse-theme","dark"); }}>🌙 Mørk</button>
+                  <button className={`theme-btn${!darkMode ? " active" : ""}`} onClick={() => { setDarkMode(false); localStorage.setItem("pulse-theme","light"); }}>☀ Lys</button>
                 </div>
               </div>
 
@@ -929,7 +929,7 @@ export default function App() {
 
         <div className="header">
           <button onClick={() => setSection(null)} style={{background:"none",border:"none",cursor:"pointer",padding:0,lineHeight:1,color:"inherit"}}>
-            <h1>IRON<span style={{color:ACCENT}}>LOG</span></h1>
+            <h1>PUL<span style={{color:ACCENT}}>SE</span></h1>
           </button>
           <span style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"2px",textTransform:"uppercase",background:"var(--surface2)",border:"1px solid var(--border)",padding:"2px 8px",marginLeft:"4px"}}>{section === "løping" ? "LØPING" : "STYRKE"}</span>
           <span className="header-date" style={{marginLeft:"8px"}}>{todayKey()}</span>

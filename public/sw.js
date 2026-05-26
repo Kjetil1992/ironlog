@@ -1,4 +1,4 @@
-const CACHE = 'ironlog-v1'
+const CACHE = 'pulse-v1'
 const ASSETS = ['/', '/index.html']
 
 self.addEventListener('install', e => {
