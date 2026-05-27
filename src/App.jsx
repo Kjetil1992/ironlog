@@ -898,8 +898,9 @@ export default function App() {
   function stopTimer() { setTimerActive(false); setTimerRemaining(timerDuration); }
   function adjustDuration(delta) {
     const next = Math.max(15, timerDuration + delta);
+    const actualDelta = next - timerDuration;
     setTimerDuration(next);
-    if (!timerActive) setTimerRemaining(next);
+    setTimerRemaining(prev => Math.max(1, prev + actualDelta));
   }
   function fmtTime(s) { return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0"); }
 
