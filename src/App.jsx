@@ -80,6 +80,8 @@ const styles = `
   .exercise-name { font-weight: 500; font-size: .9rem; }
   .exercise-val { font-family: 'DM Mono', monospace; font-size: .85rem; }
   .exercise-unit { font-size: .65rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .exercise-inline-input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: .85rem; width: 100%; padding: 4px 6px; outline: none; text-align: center; }
+  .exercise-inline-input:focus { border-color: #F97316; }
   .save-row { margin-top: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .save-msg { font-family: 'DM Mono', monospace; font-size: .75rem; color: #4caf50; letter-spacing: 1px; animation: fadeIn .3s ease; }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
@@ -1401,9 +1403,21 @@ export default function App() {
                   {exercises.map(ex => (
                     <div key={ex.id} className="exercise-item">
                       <div className="exercise-name">{ex.name}</div>
-                      <div><div className="exercise-val">{ex.sets||"–"}</div><div className="exercise-unit">sett</div></div>
-                      <div><div className="exercise-val">{ex.reps||"–"}</div><div className="exercise-unit">reps</div></div>
-                      <div><div className="exercise-val">{ex.weight||"–"}</div><div className="exercise-unit">kg</div></div>
+                      <div>
+                        <input type="number" min="1" className="exercise-inline-input" value={ex.sets||""} placeholder="–"
+                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, sets:e.target.value} : x))} />
+                        <div className="exercise-unit" style={{textAlign:"center"}}>sett</div>
+                      </div>
+                      <div>
+                        <input type="number" min="1" className="exercise-inline-input" value={ex.reps||""} placeholder="–"
+                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, reps:e.target.value} : x))} />
+                        <div className="exercise-unit" style={{textAlign:"center"}}>reps</div>
+                      </div>
+                      <div>
+                        <input type="number" min="0" step="0.5" className="exercise-inline-input" value={ex.weight||""} placeholder="–"
+                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, weight:e.target.value} : x))} />
+                        <div className="exercise-unit" style={{textAlign:"center"}}>kg</div>
+                      </div>
                       <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
                     </div>
                   ))}
