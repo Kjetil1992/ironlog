@@ -295,6 +295,31 @@ const styles = `
   .btn-logout { background: none; border: 1px solid #333; color: #666; font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; padding: 6px 12px; cursor: pointer; transition: all .15s; }
   .btn-logout:hover { border-color: #e53e3e; color: #e53e3e; }
   .user-email { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted2); letter-spacing: 1px; }
+
+  /* CALENDAR */
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-month-label { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; letter-spacing: 2px; }
+  .cal-nav-btn { background: none; border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+  .cal-nav-btn:hover { border-color: #F97316; color: #F97316; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 16px; }
+  .cal-dow { font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); text-align: center; padding: 6px 0; }
+  .cal-cell { min-height: 52px; padding: 5px 4px 4px; display: flex; flex-direction: column; align-items: center; cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s; position: relative; }
+  .cal-cell:hover { background: var(--surface2); }
+  .cal-cell.has-activity { background: var(--surface); }
+  .cal-cell.is-today .cal-num { color: #F97316; font-weight: bold; }
+  .cal-cell.is-today { border-color: rgba(249,115,22,0.3); }
+  .cal-cell.selected { border-color: #F97316 !important; background: rgba(249,115,22,0.08); }
+  .cal-num { font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--text); margin-bottom: 4px; line-height: 1; }
+  .cal-num.other-month { color: var(--muted2); }
+  .cal-dots { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+  .cal-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .cal-detail { background: var(--surface); border: 1px solid var(--border); padding: 14px 16px; margin-bottom: 16px; animation: slideIn .2s ease; }
+  .cal-detail-date { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 1px; margin-bottom: 10px; }
+  .cal-activity-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--surface2); font-size: .85rem; }
+  .cal-activity-row:last-child { border-bottom: none; }
+  .cal-activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cal-legend { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .cal-legend-item { display: flex; align-items: center; gap: 5px; font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
 `;
 
 const PROGRAM_TEMPLATES = [
@@ -1150,6 +1175,30 @@ export default function App() {
     });
   });
   const prGroups = Object.keys(EXERCISES_BY_GROUP).filter(g => prByGroup[g]);
+
+  // Estimated 1RM per exercise (Epley: weight × (1 + reps/30))
+  const est1RM = {};
+  history.forEach(session => {
+    session.exercises.forEach(ex => {
+      let best = 0;
+      if (Array.isArray(ex.sets)) {
+        ex.sets.forEach(s => {
+          const w = parseFloat(s.weight) || 0;
+          const r = parseInt(s.reps) || 1;
+          if (w) { const v = r <= 1 ? w : Math.round(w * (1 + r / 30)); if (v > best) best = v; }
+        });
+      } else {
+        const w = parseFloat(ex.weight) || 0;
+        const r = parseInt(ex.reps) || 1;
+        if (w) best = r <= 1 ? w : Math.round(w * (1 + r / 30));
+      }
+      if (best > (est1RM[ex.name] || 0)) est1RM[ex.name] = best;
+    });
+  });
+
+  // Calendar
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [selectedCalDay, setSelectedCalDay] = useState(null);
 
   // Stats
   const [selectedExercise, setSelectedExercise] = useState("");
@@ -2242,6 +2291,7 @@ export default function App() {
             <>
               <div className="subnav">
                 <button className={`subnav-btn${subNav==="history"?" active":""}`} onClick={() => setSubNav("history")}>Historikk</button>
+                <button className={`subnav-btn${subNav==="kalender"?" active":""}`} onClick={() => setSubNav("kalender")}>Kalender</button>
                 <button className={`subnav-btn${subNav==="pr"?" active":""}`} onClick={() => setSubNav("pr")}>PR</button>
                 <button className={`subnav-btn${subNav==="stats"?" active":""}`} onClick={() => setSubNav("stats")}>Statistikk</button>
               </div>
@@ -2281,6 +2331,122 @@ export default function App() {
                 </>
               )}
 
+              {subNav === "kalender" && (() => {
+                const year = calendarMonth.getFullYear();
+                const month = calendarMonth.getMonth();
+                const monthName = calendarMonth.toLocaleDateString("nb-NO", { month: "long", year: "numeric" });
+
+                // Build day grid (Mon–Sun, 6 rows)
+                const firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const cells = [];
+                for (let i = firstDow - 1; i >= 0; i--) {
+                  cells.push({ date: new Date(year, month, -i), cur: false });
+                }
+                for (let d = 1; d <= daysInMonth; d++) {
+                  cells.push({ date: new Date(year, month, d), cur: true });
+                }
+                while (cells.length < 42) {
+                  cells.push({ date: new Date(year, month + 1, cells.length - daysInMonth - firstDow + 1), cur: false });
+                }
+
+                const fmtKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                const todayKey2 = fmtKey(new Date());
+
+                // Activity map
+                const actMap = {};
+                history.forEach(s => { if (!actMap[s.date_key]) actMap[s.date_key] = []; actMap[s.date_key].push("styrke"); });
+                runs.forEach(r => { if (!actMap[r.date_key]) actMap[r.date_key] = []; if (!actMap[r.date_key].includes("løping")) actMap[r.date_key].push("løping"); });
+                rides.forEach(r => { if (!actMap[r.date_key]) actMap[r.date_key] = []; if (!actMap[r.date_key].includes("sykkel")) actMap[r.date_key].push("sykkel"); });
+
+                const actColor = { styrke: "#F97316", løping: "#3b82f6", sykkel: "#4caf50" };
+                const actLabel = { styrke: "Styrke", løping: "Løping", sykkel: "Sykkel" };
+
+                // Details for selected day
+                const selKey = selectedCalDay ? fmtKey(selectedCalDay) : null;
+                const selSessions = selKey ? history.filter(s => s.date_key === selKey) : [];
+                const selRuns = selKey ? runs.filter(r => r.date_key === selKey) : [];
+                const selRides = selKey ? rides.filter(r => r.date_key === selKey) : [];
+
+                return (
+                  <>
+                    <div className="cal-legend">
+                      {Object.entries(actColor).map(([k, c]) => (
+                        <div key={k} className="cal-legend-item">
+                          <div className="cal-dot" style={{background:c}} />
+                          {actLabel[k]}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="cal-nav">
+                      <button className="cal-nav-btn" onClick={() => setCalendarMonth(new Date(year, month - 1, 1))}>‹</button>
+                      <div className="cal-month-label">{monthName}</div>
+                      <button className="cal-nav-btn" onClick={() => setCalendarMonth(new Date(year, month + 1, 1))}>›</button>
+                    </div>
+
+                    <div className="cal-grid">
+                      {["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(d => (
+                        <div key={d} className="cal-dow">{d}</div>
+                      ))}
+                      {cells.map((cell, i) => {
+                        const key = fmtKey(cell.date);
+                        const acts = actMap[key] || [];
+                        const isToday = key === todayKey2;
+                        const isSel = key === selKey;
+                        return (
+                          <div key={i}
+                            className={`cal-cell${acts.length ? " has-activity" : ""}${isToday ? " is-today" : ""}${isSel ? " selected" : ""}`}
+                            onClick={() => setSelectedCalDay(isSel ? null : cell.date)}>
+                            <div className={`cal-num${!cell.cur ? " other-month" : ""}`}>{cell.date.getDate()}</div>
+                            {acts.length > 0 && (
+                              <div className="cal-dots">
+                                {acts.map(a => <div key={a} className="cal-dot" style={{background:actColor[a]}} />)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {selKey && (selSessions.length > 0 || selRuns.length > 0 || selRides.length > 0) && (
+                      <div className="cal-detail">
+                        <div className="cal-detail-date">
+                          {selectedCalDay.toLocaleDateString("nb-NO", { weekday:"long", day:"numeric", month:"long" })}
+                        </div>
+                        {selSessions.map((s, i) => (
+                          <div key={i} className="cal-activity-row">
+                            <div className="cal-activity-dot" style={{background:"#F97316"}} />
+                            <div style={{flex:1}}>
+                              <span style={{fontWeight:500}}>Styrke</span>
+                              {s.program_name && <span style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginLeft:"8px"}}>{s.program_name}</span>}
+                            </div>
+                            <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)"}}>{s.exercises.length} øvelser · {totalVolume(s.exercises) > 0 ? `${totalVolume(s.exercises).toLocaleString("nb-NO")} kg` : ""}</div>
+                          </div>
+                        ))}
+                        {selRuns.map((r, i) => (
+                          <div key={i} className="cal-activity-row">
+                            <div className="cal-activity-dot" style={{background:"#3b82f6"}} />
+                            <div style={{flex:1}}><span style={{fontWeight:500}}>Løping</span><span style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginLeft:"8px"}}>{r.notes || r.type}</span></div>
+                            <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)"}}>{parseFloat(r.distance).toFixed(1)} km · {fmtDuration(r.duration)}</div>
+                          </div>
+                        ))}
+                        {selRides.map((r, i) => (
+                          <div key={i} className="cal-activity-row">
+                            <div className="cal-activity-dot" style={{background:"#4caf50"}} />
+                            <div style={{flex:1}}><span style={{fontWeight:500}}>Sykkel</span><span style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",marginLeft:"8px"}}>{r.notes || r.type}</span></div>
+                            <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)"}}>{parseFloat(r.distance).toFixed(1)} km · {fmtDuration(r.duration)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selKey && selSessions.length === 0 && selRuns.length === 0 && selRides.length === 0 && (
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)",padding:"12px 0",letterSpacing:"1px"}}>Ingen aktivitet denne dagen.</div>
+                    )}
+                  </>
+                );
+              })()}
+
               {subNav === "pr" && (
                 <>
                   {prGroups.length === 0 ? (
@@ -2299,6 +2465,9 @@ export default function App() {
                                 {pr.weight > 0 && <span className="pr-weight-unit">kg</span>}
                               </div>
                               {pr.sets && pr.reps && <div className="pr-detail">{pr.sets}×{pr.reps} reps</div>}
+                              {est1RM[name] && est1RM[name] > (pr.weight || 0) && (
+                                <div className="pr-detail" style={{color:"#F97316",marginTop:"4px"}}>Est. 1RM: {est1RM[name]} kg</div>
+                              )}
                               <div className="pr-detail">{pr.date}</div>
                             </div>
                           ))}
