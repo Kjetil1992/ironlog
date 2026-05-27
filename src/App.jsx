@@ -828,8 +828,10 @@ export default function App() {
   const [cycleSubNav, setCycleSubNav] = useState("stats");
   const [progSubNav, setProgSubNav] = useState("mine");
   const [runs, setRuns] = useState([]);
-  const [runForm, setRunForm] = useState({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "" });
+  const [runForm, setRunForm] = useState({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "", date: "" });
   const [runSaved, setRunSaved] = useState(false);
+  const [rideForm, setRideForm] = useState({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "", date: "" });
+  const [rideSaved, setRideSaved] = useState(false);
   const [stravaConnected, setStravaConnected] = useState(false);
   const [stravaSyncing, setStravaSyncing] = useState(false);
   const [stravaMsg, setStravaMsg] = useState("");
@@ -901,17 +903,40 @@ export default function App() {
 
   async function saveRun() {
     const dist = parseFloat(runForm.distance);
+    if (!dist) return;
     const secs = (parseInt(runForm.hours)||0)*3600 + (parseInt(runForm.minutes)||0)*60 + (parseInt(runForm.seconds)||0);
-    if (!dist || !secs) return;
+    const dateKey = runForm.date || todayKey();
+    const dateLabel = runForm.date
+      ? new Date(runForm.date + "T12:00:00").toLocaleDateString("nb-NO", { weekday:"long", year:"numeric", month:"long", day:"numeric" })
+      : today();
     const { data, error } = await supabase.from("runs").insert({
-      user_id: user.id, date: today(), date_key: todayKey(),
+      user_id: user.id, date: dateLabel, date_key: dateKey,
       distance: dist, duration: secs, type: runForm.type, notes: runForm.notes
     }).select().single();
     if (error) { alert("Feil: " + error.message); return; }
-    if (data) setRuns(prev => [data, ...prev]);
-    setRunForm({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "" });
+    if (data) setRuns(prev => [data, ...prev].sort((a,b) => b.date_key.localeCompare(a.date_key)));
+    setRunForm({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "", date: "" });
     setRunSaved(true);
     setTimeout(() => setRunSaved(false), 2500);
+  }
+
+  async function saveCyclingRide() {
+    const dist = parseFloat(rideForm.distance);
+    if (!dist) return;
+    const secs = (parseInt(rideForm.hours)||0)*3600 + (parseInt(rideForm.minutes)||0)*60 + (parseInt(rideForm.seconds)||0);
+    const dateKey = rideForm.date || todayKey();
+    const dateLabel = rideForm.date
+      ? new Date(rideForm.date + "T12:00:00").toLocaleDateString("nb-NO", { weekday:"long", year:"numeric", month:"long", day:"numeric" })
+      : today();
+    const { data, error } = await supabase.from("rides").insert({
+      user_id: user.id, date: dateLabel, date_key: dateKey,
+      distance: dist, duration: secs, type: rideForm.type, notes: rideForm.notes
+    }).select().single();
+    if (error) { alert("Feil: " + error.message); return; }
+    if (data) setRides(prev => [data, ...prev].sort((a,b) => b.date_key.localeCompare(a.date_key)));
+    setRideForm({ distance: "", hours: "", minutes: "", seconds: "", type: "Vei", notes: "", date: "" });
+    setRideSaved(true);
+    setTimeout(() => setRideSaved(false), 2500);
   }
 
   async function deleteRun(id) {
@@ -1964,10 +1989,83 @@ export default function App() {
           {tab === "running" && (
             <div className="subnav" style={{marginBottom:"24px"}}>
               <button className={`subnav-btn${runSubNav==="stats"?" active":""}`} onClick={() => setRunSubNav("stats")}>Statistikk</button>
+              <button className={`subnav-btn${runSubNav==="logg"?" active":""}`} onClick={() => setRunSubNav("logg")}>Logg tur</button>
               <button className={`subnav-btn${runSubNav==="plan"?" active":""}`} onClick={() => setRunSubNav("plan")}>Planlegg tur</button>
               <button className={`subnav-btn${runSubNav==="skade"?" active":""}`} onClick={() => setRunSubNav("skade")}>Skadeforebygging</button>
             </div>
           )}
+          {tab === "running" && runSubNav === "logg" && (() => {
+            const RUN_TYPES = ["Vei","Sti","Intervall","Rolig","Tempo"];
+            const secs = (parseInt(runForm.hours)||0)*3600 + (parseInt(runForm.minutes)||0)*60 + (parseInt(runForm.seconds)||0);
+            const dist = parseFloat(runForm.distance) || 0;
+            const pace = dist > 0 && secs > 0 ? calcPace(dist, secs) : null;
+            return (
+              <>
+                <div className="section-title" style={{marginBottom:"20px"}}>LOGG <span>LØPETUR</span></div>
+
+                {/* Type */}
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"2px",textTransform:"uppercase",color:"var(--muted)",marginBottom:"8px"}}>Type tur</div>
+                <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"16px"}}>
+                  {RUN_TYPES.map(t => (
+                    <button key={t} className={`run-type-btn${runForm.type===t?" active":""}`}
+                      style={{flex:"0 0 auto",padding:"8px 14px"}}
+                      onClick={() => setRunForm(f => ({...f, type:t}))}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Distance */}
+                <div className="field" style={{marginBottom:"12px"}}>
+                  <label>Distanse (km)</label>
+                  <input type="number" min="0" step="0.01" value={runForm.distance}
+                    onChange={e => setRunForm(f => ({...f, distance:e.target.value}))}
+                    placeholder="5.0" />
+                </div>
+
+                {/* Duration */}
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"2px",textTransform:"uppercase",color:"var(--muted)",marginBottom:"8px"}}>Tid (valgfritt)</div>
+                <div className="run-time-row" style={{marginBottom:"12px"}}>
+                  <div className="field">
+                    <label>Timer</label>
+                    <input type="number" min="0" value={runForm.hours} onChange={e => setRunForm(f => ({...f, hours:e.target.value}))} placeholder="0" />
+                  </div>
+                  <div className="field">
+                    <label>Minutter</label>
+                    <input type="number" min="0" max="59" value={runForm.minutes} onChange={e => setRunForm(f => ({...f, minutes:e.target.value}))} placeholder="30" />
+                  </div>
+                  <div className="field">
+                    <label>Sekunder</label>
+                    <input type="number" min="0" max="59" value={runForm.seconds} onChange={e => setRunForm(f => ({...f, seconds:e.target.value}))} placeholder="0" />
+                  </div>
+                </div>
+
+                {pace && (
+                  <div className="pace-display" style={{marginBottom:"12px"}}>
+                    <div><div className="pace-label">Tempo</div><div className="pace-val">{pace}</div></div>
+                    <div style={{textAlign:"right"}}><div className="pace-label">min/km</div></div>
+                  </div>
+                )}
+
+                {/* Date */}
+                <div className="field" style={{marginBottom:"12px"}}>
+                  <label>Dato (valgfritt – standard er i dag)</label>
+                  <input type="date" value={runForm.date} onChange={e => setRunForm(f => ({...f, date:e.target.value}))} />
+                </div>
+
+                {/* Notes */}
+                <div className="field" style={{marginBottom:"20px"}}>
+                  <label>Notat (valgfritt)</label>
+                  <input value={runForm.notes} onChange={e => setRunForm(f => ({...f, notes:e.target.value}))} placeholder="f.eks. Morgentur i parken" />
+                </div>
+
+                <div className="save-row">
+                  <button className="btn-orange" onClick={saveRun} disabled={!runForm.distance}>LAGRE TUR</button>
+                  {runSaved && <span className="save-msg">✓ LØPETUR LAGRET</span>}
+                </div>
+              </>
+            );
+          })()}
           {tab === "running" && runSubNav === "plan" && (
             <RouteMap sport="løping" user={user} />
           )}
@@ -2194,10 +2292,83 @@ export default function App() {
           {tab === "cycling" && (
             <div className="subnav" style={{marginBottom:"24px"}}>
               <button className={`subnav-btn${cycleSubNav==="stats"?" active":""}`} onClick={() => setCycleSubNav("stats")}>Statistikk</button>
+              <button className={`subnav-btn${cycleSubNav==="logg"?" active":""}`} onClick={() => setCycleSubNav("logg")}>Logg tur</button>
               <button className={`subnav-btn${cycleSubNav==="plan"?" active":""}`} onClick={() => setCycleSubNav("plan")}>Planlegg tur</button>
               <button className={`subnav-btn${cycleSubNav==="skade"?" active":""}`} onClick={() => setCycleSubNav("skade")}>Skadeforebygging</button>
             </div>
           )}
+          {tab === "cycling" && cycleSubNav === "logg" && (() => {
+            const RIDE_TYPES = ["Vei","Grus","Terreng","El-sykkel","Virtuell"];
+            const secs = (parseInt(rideForm.hours)||0)*3600 + (parseInt(rideForm.minutes)||0)*60 + (parseInt(rideForm.seconds)||0);
+            const dist = parseFloat(rideForm.distance) || 0;
+            const speed = dist > 0 && secs > 0 ? calcSpeed(dist, secs) : null;
+            return (
+              <>
+                <div className="section-title" style={{marginBottom:"20px"}}>LOGG <span>SYKKELTUR</span></div>
+
+                {/* Type */}
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"2px",textTransform:"uppercase",color:"var(--muted)",marginBottom:"8px"}}>Type tur</div>
+                <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"16px"}}>
+                  {RIDE_TYPES.map(t => (
+                    <button key={t} className={`run-type-btn${rideForm.type===t?" active":""}`}
+                      style={{flex:"0 0 auto",padding:"8px 14px"}}
+                      onClick={() => setRideForm(f => ({...f, type:t}))}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Distance */}
+                <div className="field" style={{marginBottom:"12px"}}>
+                  <label>Distanse (km)</label>
+                  <input type="number" min="0" step="0.1" value={rideForm.distance}
+                    onChange={e => setRideForm(f => ({...f, distance:e.target.value}))}
+                    placeholder="20.0" />
+                </div>
+
+                {/* Duration */}
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"2px",textTransform:"uppercase",color:"var(--muted)",marginBottom:"8px"}}>Tid (valgfritt)</div>
+                <div className="run-time-row" style={{marginBottom:"12px"}}>
+                  <div className="field">
+                    <label>Timer</label>
+                    <input type="number" min="0" value={rideForm.hours} onChange={e => setRideForm(f => ({...f, hours:e.target.value}))} placeholder="1" />
+                  </div>
+                  <div className="field">
+                    <label>Minutter</label>
+                    <input type="number" min="0" max="59" value={rideForm.minutes} onChange={e => setRideForm(f => ({...f, minutes:e.target.value}))} placeholder="0" />
+                  </div>
+                  <div className="field">
+                    <label>Sekunder</label>
+                    <input type="number" min="0" max="59" value={rideForm.seconds} onChange={e => setRideForm(f => ({...f, seconds:e.target.value}))} placeholder="0" />
+                  </div>
+                </div>
+
+                {speed && (
+                  <div className="pace-display" style={{marginBottom:"12px"}}>
+                    <div><div className="pace-label">Snittfart</div><div className="pace-val">{speed}</div></div>
+                    <div style={{textAlign:"right"}}><div className="pace-label">km/t</div></div>
+                  </div>
+                )}
+
+                {/* Date */}
+                <div className="field" style={{marginBottom:"12px"}}>
+                  <label>Dato (valgfritt – standard er i dag)</label>
+                  <input type="date" value={rideForm.date} onChange={e => setRideForm(f => ({...f, date:e.target.value}))} />
+                </div>
+
+                {/* Notes */}
+                <div className="field" style={{marginBottom:"20px"}}>
+                  <label>Notat (valgfritt)</label>
+                  <input value={rideForm.notes} onChange={e => setRideForm(f => ({...f, notes:e.target.value}))} placeholder="f.eks. Søndagstur på grusveier" />
+                </div>
+
+                <div className="save-row">
+                  <button className="btn-orange" onClick={saveCyclingRide} disabled={!rideForm.distance}>LAGRE TUR</button>
+                  {rideSaved && <span className="save-msg">✓ SYKKELTUR LAGRET</span>}
+                </div>
+              </>
+            );
+          })()}
           {tab === "cycling" && cycleSubNav === "plan" && (
             <RouteMap sport="sykkel" user={user} />
           )}
