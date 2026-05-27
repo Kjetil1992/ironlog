@@ -300,6 +300,21 @@ const styles = `
   .landing-card-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #F97316; transform: scaleX(0); transition: transform .25s ease; transform-origin: left; }
   .landing-card:hover .landing-card-bar { transform: scaleX(1); }
 
+  /* GOAL TRACKING */
+  .goal-card { background: var(--surface); border: 1px solid var(--border); padding: 16px 18px; margin-bottom: 10px; position: relative; overflow: hidden; transition: border-color .15s; animation: slideIn .2s ease; }
+  .goal-card::before { content: ""; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: #F97316; }
+  .goal-card.achieved::before { background: #4caf50; }
+  .goal-card-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 2px; }
+  .goal-card-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.2rem; letter-spacing: 1px; flex: 1; line-height: 1.2; }
+  .goal-progress-bar { height: 6px; background: var(--surface2); overflow: hidden; margin: 10px 0 6px; }
+  .goal-progress-fill { height: 100%; transition: width .5s ease; }
+  .goal-meta { font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--muted); letter-spacing: 1px; display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+  .goal-achieved-badge { font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: 2px; text-transform: uppercase; background: #4caf50; color: #000; padding: 2px 8px; flex-shrink: 0; align-self: center; }
+  .goal-form { border: 1px dashed var(--border2); padding: 20px; margin-bottom: 20px; }
+  .goal-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+  .goal-type-btn { padding: 8px 6px; border: 1px solid var(--border); background: none; color: var(--text); font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all .15s; text-align: center; line-height: 1.4; }
+  .goal-type-btn.active { border-color: #F97316; color: #F97316; background: rgba(249,115,22,0.05); }
+
   /* AUTH */
   .auth-screen { min-height: 100vh; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px; }
   .auth-box { width: 100%; max-width: 400px; }
@@ -1068,6 +1083,40 @@ export default function App() {
     });
   }
 
+  // Goals helpers
+  function loadGoals(uid) {
+    try {
+      const saved = localStorage.getItem(`pulse-goals-${uid}`);
+      if (saved) setGoals(JSON.parse(saved));
+    } catch {}
+  }
+  function saveGoals(newGoals) {
+    setGoals(newGoals);
+    if (user) localStorage.setItem(`pulse-goals-${user.id}`, JSON.stringify(newGoals));
+  }
+  function addGoal() {
+    if (!goalForm.title.trim() || !goalForm.target) return;
+    const UNIT_LABELS = { styrke:"kg", løping_km:"km", sykkel_km:"km", okter:"økter", vekt:"kg" };
+    const newGoal = {
+      id: Date.now() + Math.random(),
+      title: goalForm.title.trim(),
+      type: goalForm.type,
+      exercise: goalForm.exercise,
+      target: parseFloat(goalForm.target),
+      unit: goalForm.type === "egendefinert" ? (goalForm.unit || "") : UNIT_LABELS[goalForm.type] || "",
+      deadline: goalForm.deadline,
+      current: parseFloat(goalForm.current) || 0,
+      achieved: false,
+      createdAt: todayKey(),
+    };
+    saveGoals([...goals, newGoal]);
+    setShowGoalForm(false);
+    setGoalForm({ type:"styrke", title:"", exercise:"Benkpress", exerciseGroup:"Bryst", target:"", deadline:"", unit:"kg", current:"" });
+  }
+  function deleteGoal(id) { saveGoals(goals.filter(g => g.id !== id)); }
+  function toggleGoalAchieved(id) { saveGoals(goals.map(g => g.id === id ? {...g, achieved:!g.achieved} : g)); }
+  function updateGoalCurrent(id, val) { saveGoals(goals.map(g => g.id === id ? {...g, current:parseFloat(val)||0} : g)); }
+
   // Load data when user logs in
   useEffect(() => {
     if (!user) { setHistory([]); setPrograms([]); setProfile({ username:"", weight:"", height:"", age:"", goals:[] }); return; }
@@ -1078,6 +1127,7 @@ export default function App() {
     loadRides();
     checkStravaConnection();
     loadWeeklyPlan(user.id);
+    loadGoals(user.id);
   }, [user]);
 
   async function loadHistory() {
@@ -1236,6 +1286,23 @@ export default function App() {
     });
   });
 
+  // Compute auto-progress for a goal
+  function getGoalCurrent(goal) {
+    const now = new Date();
+    const monthKey = now.toISOString().slice(0,7);
+    const oneWeekAgo = new Date(now);
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    switch (goal.type) {
+      case "styrke": return est1RM[goal.exercise] || 0;
+      case "løping_km": return Math.round(runs.filter(r => r.date_key.startsWith(monthKey)).reduce((s,r) => s + parseFloat(r.distance), 0) * 10) / 10;
+      case "sykkel_km": return Math.round(rides.filter(r => r.date_key.startsWith(monthKey)).reduce((s,r) => s + parseFloat(r.distance), 0) * 10) / 10;
+      case "okter": return history.filter(s => new Date(s.date_key) >= oneWeekAgo).length;
+      case "vekt": return weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight : 0;
+      case "egendefinert": return goal.current || 0;
+      default: return 0;
+    }
+  }
+
   // Calendar
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedCalDay, setSelectedCalDay] = useState(null);
@@ -1244,6 +1311,11 @@ export default function App() {
   const [weeklyPlan, setWeeklyPlan] = useState(() => Array.from({length:7}, () => ({activities:[]})));
   const [editingPlanDay, setEditingPlanDay] = useState(null);
   const [planForm, setPlanForm] = useState({type:"styrke", programId:"", distance:"", notes:""});
+
+  // Goals (localStorage)
+  const [goals, setGoals] = useState([]);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [goalForm, setGoalForm] = useState({ type:"styrke", title:"", exercise:"Benkpress", exerciseGroup:"Bryst", target:"", deadline:"", unit:"kg", current:"" });
 
   // Stats
   const [selectedExercise, setSelectedExercise] = useState("");
@@ -1457,7 +1529,7 @@ export default function App() {
             : section === "sykkel"
             ? [["cycling","SYKKEL"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
             : section === "plan"
-            ? [["plan","UKESPLAN"],["profile","PROFIL"]]
+            ? [["plan","UKESPLAN"],["goals","MÅL"],["profile","PROFIL"]]
             : [["dashboard","DASHBOARD"],["log","LOGG ØKT"],["programs","PROGRAMMER"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
           ).map(([key,label]) => (
             <button key={key} className={`tab${tab===key?" active":""}`} onClick={() => setTab(key)}>{label}</button>
@@ -2794,6 +2866,252 @@ export default function App() {
                 <div style={{marginTop:"16px",fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"1px"}}>
                   Planen lagres lokalt på denne enheten. Klikk en dag for å redigere.
                 </div>
+              </>
+            );
+          })()}
+
+          {/* ── MÅL ── */}
+          {tab === "goals" && (() => {
+            const GOAL_TYPES = [
+              { id:"styrke",     label:"Styrke 1RM",        icon:"🏋️" },
+              { id:"løping_km",  label:"Løping km",         icon:"🏃" },
+              { id:"sykkel_km",  label:"Sykkel km",         icon:"🚴" },
+              { id:"okter",      label:"Ukentlige økter",   icon:"📅" },
+              { id:"vekt",       label:"Kroppsvekt",        icon:"⚖️" },
+              { id:"egendefinert", label:"Egendefinert",    icon:"✏️" },
+            ];
+            const UNIT_LABELS = { styrke:"kg", løping_km:"km", sykkel_km:"km", okter:"økter", vekt:"kg", egendefinert:"" };
+            const TYPE_CURRENT_LABEL = {
+              styrke: "Nåværende est. 1RM",
+              løping_km: "Km denne måneden",
+              sykkel_km: "Km denne måneden",
+              okter: "Økter siste 7 dager",
+              vekt: "Nåværende vekt",
+              egendefinert: "Fremgang",
+            };
+
+            function isOverdue(goal) { return goal.deadline && goal.deadline < todayKey() && !goal.achieved; }
+            function daysLeft(deadline) { return Math.ceil((new Date(deadline) - new Date(todayKey())) / (1000*60*60*24)); }
+
+            const monthKey = new Date().toISOString().slice(0,7);
+            const curRunKm = Math.round(runs.filter(r=>r.date_key.startsWith(monthKey)).reduce((s,r)=>s+parseFloat(r.distance),0)*10)/10;
+            const curRideKm = Math.round(rides.filter(r=>r.date_key.startsWith(monthKey)).reduce((s,r)=>s+parseFloat(r.distance),0)*10)/10;
+
+            return (
+              <>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"20px",flexWrap:"wrap",gap:"10px"}}>
+                  <div className="section-title">MINE <span>MÅL</span></div>
+                  {!showGoalForm && (
+                    <button className="btn-orange" onClick={() => setShowGoalForm(true)}>+ NY MÅL</button>
+                  )}
+                </div>
+
+                {/* ── FORM ── */}
+                {showGoalForm && (
+                  <div className="goal-form">
+                    <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"3px",textTransform:"uppercase",color:"var(--muted)",marginBottom:"12px"}}>NY MÅL</div>
+
+                    <div className="goal-type-grid">
+                      {GOAL_TYPES.map(gt => (
+                        <button key={gt.id}
+                          className={`goal-type-btn${goalForm.type===gt.id?" active":""}`}
+                          onClick={() => {
+                            const auto = gt.id==="styrke" ? `${goalForm.exercise} 1RM` :
+                              gt.id==="løping_km" ? "Månedlig løpedistanse" :
+                              gt.id==="sykkel_km" ? "Månedlig syklingsdistanse" :
+                              gt.id==="okter" ? "Ukentlige treningsøkter" :
+                              gt.id==="vekt" ? "Kroppsvektmål" : "";
+                            setGoalForm(f => ({...f, type:gt.id, unit:UNIT_LABELS[gt.id]||"", title: f.title || auto}));
+                          }}>
+                          {gt.icon}<br />{gt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Styrke: exercise picker */}
+                    {goalForm.type === "styrke" && (
+                      <>
+                        <div className="form-2col" style={{marginBottom:"8px"}}>
+                          <div className="field">
+                            <label>Muskelgruppe</label>
+                            <select value={goalForm.exerciseGroup}
+                              onChange={e => setGoalForm(f => ({...f, exerciseGroup:e.target.value, exercise:EXERCISES_BY_GROUP[e.target.value][0]}))}>
+                              {Object.keys(EXERCISES_BY_GROUP).map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Øvelse</label>
+                            <select value={goalForm.exercise}
+                              onChange={e => setGoalForm(f => ({...f, exercise:e.target.value}))}>
+                              {EXERCISES_BY_GROUP[goalForm.exerciseGroup].map(ex => <option key={ex} value={ex}>{ex}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        {est1RM[goalForm.exercise] > 0 && (
+                          <div style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"#F97316",letterSpacing:"1px",marginBottom:"10px"}}>
+                            Nåværende est. 1RM: {est1RM[goalForm.exercise]} kg
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Løping hint */}
+                    {goalForm.type === "løping_km" && curRunKm > 0 && (
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"#3b82f6",letterSpacing:"1px",marginBottom:"10px"}}>
+                        Denne måneden: {curRunKm} km løpt
+                      </div>
+                    )}
+
+                    {/* Sykkel hint */}
+                    {goalForm.type === "sykkel_km" && curRideKm > 0 && (
+                      <div style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"#4caf50",letterSpacing:"1px",marginBottom:"10px"}}>
+                        Denne måneden: {curRideKm} km syklet
+                      </div>
+                    )}
+
+                    {/* Egendefinert: unit + startvalue */}
+                    {goalForm.type === "egendefinert" && (
+                      <div className="form-2col" style={{marginBottom:"8px"}}>
+                        <div className="field">
+                          <label>Enhet</label>
+                          <input value={goalForm.unit} onChange={e => setGoalForm(f => ({...f, unit:e.target.value}))} placeholder="f.eks. km, reps, dager..." />
+                        </div>
+                        <div className="field">
+                          <label>Startverdi</label>
+                          <input type="number" step="any" value={goalForm.current} onChange={e => setGoalForm(f => ({...f, current:e.target.value}))} placeholder="0" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Title */}
+                    <div className="field" style={{marginBottom:"8px"}}>
+                      <label>Navn på mål</label>
+                      <input value={goalForm.title}
+                        onChange={e => setGoalForm(f => ({...f, title:e.target.value}))}
+                        placeholder={
+                          goalForm.type==="styrke" ? `f.eks. ${goalForm.exercise} 100 kg` :
+                          goalForm.type==="løping_km" ? "f.eks. 100 km i måneden" :
+                          goalForm.type==="sykkel_km" ? "f.eks. 200 km i måneden" :
+                          goalForm.type==="okter" ? "f.eks. 4 økter per uke" :
+                          goalForm.type==="vekt" ? "f.eks. Ned til 80 kg" :
+                          "Beskriv målet ditt..."
+                        } />
+                    </div>
+
+                    {/* Target + deadline */}
+                    <div className="form-2col" style={{marginBottom:"8px"}}>
+                      <div className="field">
+                        <label>Mål ({goalForm.type==="egendefinert" ? (goalForm.unit||"verdi") : UNIT_LABELS[goalForm.type]})</label>
+                        <input type="number" step="any" value={goalForm.target}
+                          onChange={e => setGoalForm(f => ({...f, target:e.target.value}))}
+                          placeholder={goalForm.type==="styrke"?"100":goalForm.type==="okter"?"4":"50"} />
+                      </div>
+                      <div className="field">
+                        <label>Frist (valgfritt)</label>
+                        <input type="date" value={goalForm.deadline} onChange={e => setGoalForm(f => ({...f, deadline:e.target.value}))} />
+                      </div>
+                    </div>
+
+                    <div className="save-row" style={{marginTop:"16px"}}>
+                      <button className="btn-orange" onClick={addGoal} disabled={!goalForm.title.trim()||!goalForm.target}>LAGRE MÅL</button>
+                      <button className="btn-ghost" onClick={() => { setShowGoalForm(false); setGoalForm({type:"styrke",title:"",exercise:"Benkpress",exerciseGroup:"Bryst",target:"",deadline:"",unit:"kg",current:""}); }}>avbryt</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── GOAL CARDS ── */}
+                {goals.length === 0 && !showGoalForm ? (
+                  <div className="empty" style={{paddingTop:"40px"}}>
+                    ingen mål satt ennå
+                    <div style={{marginTop:"16px"}}>
+                      <button className="btn-outline" style={{fontSize:".8rem",padding:"8px 16px"}} onClick={() => setShowGoalForm(true)}>Sett ditt første mål →</button>
+                    </div>
+                  </div>
+                ) : goals.map(goal => {
+                  const current = getGoalCurrent(goal);
+                  const pct = goal.target > 0
+                    ? goal.type==="vekt"
+                      // for body weight, direction depends on whether target < starting weight; show 100% when reached
+                      ? Math.min(100, Math.round(Math.abs((current - goal.target)) <= 0 ? 100 : Math.max(0, (1 - Math.abs(current - goal.target) / goal.target) * 100)))
+                      : Math.min(100, Math.round((current / goal.target) * 100))
+                    : 0;
+                  const isAchieved = goal.achieved || (goal.type !== "vekt" && pct >= 100);
+                  const unit = goal.type==="egendefinert" ? (goal.unit||"") : UNIT_LABELS[goal.type]||"";
+                  const progressColor = isAchieved ? "#4caf50" : pct>66 ? "#F97316" : pct>33 ? "#a855f7" : "#3b82f6";
+
+                  let deadlineEl = null;
+                  if (goal.deadline && !isAchieved) {
+                    const dl = daysLeft(goal.deadline);
+                    if (dl < 0) deadlineEl = <span style={{color:"#e53e3e"}}>Forfalt for {-dl} dag{-dl!==1?"er":""} siden</span>;
+                    else if (dl === 0) deadlineEl = <span style={{color:"#F97316"}}>Frist i dag!</span>;
+                    else deadlineEl = <span>{dl} dag{dl!==1?"er":""} igjen · {goal.deadline}</span>;
+                  } else if (goal.deadline && isAchieved) {
+                    deadlineEl = <span>{goal.deadline}</span>;
+                  }
+
+                  return (
+                    <div key={goal.id} className={`goal-card${isAchieved?" achieved":""}`}>
+                      <div className="goal-card-header">
+                        <div className="goal-card-title">{goal.title}</div>
+                        {isAchieved && <div className="goal-achieved-badge">✓ Oppnådd</div>}
+                        <button className="btn-icon" onClick={() => deleteGoal(goal.id)} title="Slett mål" style={{flexShrink:0}}>🗑</button>
+                      </div>
+
+                      {/* Progress numbers */}
+                      <div style={{display:"flex",alignItems:"baseline",gap:"8px",marginTop:"8px"}}>
+                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:progressColor,lineHeight:1}}>{current}</span>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"var(--muted)"}}>/ {goal.target} {unit}</span>
+                        <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.2rem",color:progressColor,marginLeft:"auto"}}>{pct}%</span>
+                      </div>
+
+                      <div className="goal-progress-bar">
+                        <div className="goal-progress-fill" style={{width:`${pct}%`,background:progressColor}} />
+                      </div>
+
+                      <div className="goal-meta">
+                        <span>{TYPE_CURRENT_LABEL[goal.type]||""}</span>
+                        {deadlineEl && <span>{deadlineEl}</span>}
+                        <span style={{color:"var(--muted2)"}}>Startet {goal.createdAt}</span>
+                      </div>
+
+                      {/* Egendefinert: manual progress input */}
+                      {goal.type==="egendefinert" && !isAchieved && (
+                        <div style={{display:"flex",gap:"8px",marginTop:"10px",alignItems:"center",flexWrap:"wrap"}}>
+                          <div style={{fontFamily:"'DM Mono',monospace",fontSize:".6rem",color:"var(--muted)",letterSpacing:"1px"}}>Oppdater fremgang:</div>
+                          <input type="number" step="any"
+                            defaultValue={goal.current||0}
+                            onBlur={e => updateGoalCurrent(goal.id, e.target.value)}
+                            style={{width:"90px",background:"var(--surface2)",border:"1px solid var(--border)",color:"var(--text)",fontFamily:"'DM Mono',monospace",fontSize:".8rem",padding:"5px 8px",outline:"none"}} />
+                          {unit && <span style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)"}}>{unit}</span>}
+                          <button onClick={() => toggleGoalAchieved(goal.id)}
+                            style={{marginLeft:"auto",background:"none",border:"1px solid #4caf50",color:"#4caf50",fontFamily:"'DM Mono',monospace",fontSize:".65rem",letterSpacing:"1px",padding:"5px 12px",cursor:"pointer",transition:"all .15s"}}>
+                            Merk oppnådd ✓
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Mark achieved button when close */}
+                      {goal.type!=="egendefinert" && !isAchieved && pct >= 85 && (
+                        <div style={{marginTop:"8px"}}>
+                          <button onClick={() => toggleGoalAchieved(goal.id)}
+                            style={{background:"none",border:"1px solid #4caf50",color:"#4caf50",fontFamily:"'DM Mono',monospace",fontSize:".65rem",letterSpacing:"1px",padding:"5px 12px",cursor:"pointer",transition:"all .15s"}}>
+                            Merk som oppnådd ✓
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Undo achieved */}
+                      {goal.achieved && (
+                        <div style={{marginTop:"6px"}}>
+                          <button onClick={() => toggleGoalAchieved(goal.id)}
+                            style={{background:"none",border:"1px solid var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"1px",padding:"4px 10px",cursor:"pointer"}}>
+                            Angre
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </>
             );
           })()}
