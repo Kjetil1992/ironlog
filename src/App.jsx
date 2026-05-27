@@ -1023,7 +1023,7 @@ export default function App() {
   function addLogExercise() {
     const finalName = logForm.name === "__annet__" ? (logForm.customName||"").trim() : logForm.name;
     if (!finalName) return;
-    setExercises(prev => [...prev, { ...logForm, name: finalName, id: Date.now() }]);
+    setExercises(prev => [...prev, { ...logForm, name: finalName, id: Date.now(), done: false }]);
     setLogForm(f => ({ ...f, sets: "", reps: "", weight: "", customName: "" }));
     startTimer();
   }
@@ -1051,7 +1051,7 @@ export default function App() {
   }
 
   function loadProgram(program) {
-    const loaded = program.exercises.map(ex => ({ ...ex, id: Date.now() + Math.random() }));
+    const loaded = program.exercises.map(ex => ({ ...ex, id: Date.now() + Math.random(), done: false }));
     setExercises(loaded);
     setLoadedProgram(program.name);
     setTab("log");
@@ -1456,27 +1456,59 @@ export default function App() {
 
               {exercises.length > 0 && (
                 <div style={{marginTop:"16px"}}>
-                  {exercises.map(ex => (
+                  {exercises.map(ex => {
+                    const markDone = () => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, done:true} : x));
+                    const markUndone = () => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, done:false} : x));
+                    const checkDone = () => {
+                      setExercises(prev => prev.map(x => {
+                        if (x.id !== ex.id) return x;
+                        if (x.sets && x.reps && x.weight) return {...x, done:true};
+                        return x;
+                      }));
+                    };
+                    if (ex.done) return (
+                      <div key={ex.id} className="exercise-item" style={{gridTemplateColumns:"auto 1fr auto",borderColor:"#4caf50",animation:"none"}}>
+                        <button onClick={markUndone} style={{width:"28px",height:"28px",background:"#4caf50",border:"none",color:"#000",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:"1rem",flexShrink:0}}>✓</button>
+                        <div style={{paddingLeft:"6px"}}>
+                          <div className="exercise-name">{ex.name}</div>
+                          <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"#4caf50",marginTop:"2px"}}>
+                            {ex.sets}×{ex.reps}{ex.weight ? ` · ${ex.weight} kg` : ""}
+                          </div>
+                        </div>
+                        <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
+                      </div>
+                    );
+                    return (
                     <div key={ex.id} className="exercise-item">
                       <div className="exercise-name">{ex.name}</div>
                       <div>
                         <input type="number" min="1" className="exercise-inline-input" value={ex.sets||""} placeholder="–"
-                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, sets:e.target.value} : x))} />
+                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, sets:e.target.value} : x))}
+                          onBlur={checkDone} />
                         <div className="exercise-unit" style={{textAlign:"center"}}>sett</div>
                       </div>
                       <div>
                         <input type="number" min="1" className="exercise-inline-input" value={ex.reps||""} placeholder="–"
-                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, reps:e.target.value} : x))} />
+                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, reps:e.target.value} : x))}
+                          onBlur={checkDone} />
                         <div className="exercise-unit" style={{textAlign:"center"}}>reps</div>
                       </div>
                       <div>
                         <input type="number" min="0" step="0.5" className="exercise-inline-input" value={ex.weight||""} placeholder="–"
-                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, weight:e.target.value} : x))} />
+                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, weight:e.target.value} : x))}
+                          onBlur={checkDone} />
                         <div className="exercise-unit" style={{textAlign:"center"}}>kg</div>
                       </div>
-                      <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
+                      <div style={{display:"flex",gap:"4px",alignItems:"center"}}>
+                        {ex.sets && ex.reps && (
+                          <button onClick={markDone} title="Merk som ferdig"
+                            style={{width:"28px",height:"28px",background:"none",border:"1px solid #4caf50",color:"#4caf50",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:".9rem",flexShrink:0}}>✓</button>
+                        )}
+                        <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
+                      </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
