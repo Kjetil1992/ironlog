@@ -904,6 +904,11 @@ export default function App() {
     setRuns(prev => prev.filter(r => r.id !== id));
   }
 
+  async function deleteRide(id) {
+    await supabase.from("rides").delete().eq("id", id);
+    setRides(prev => prev.filter(r => r.id !== id));
+  }
+
   function fmtDuration(secs) {
     const h = Math.floor(secs/3600);
     const m = Math.floor((secs%3600)/60);
@@ -1448,9 +1453,9 @@ export default function App() {
 
         <div className="tabs">
           {(section === "løping"
-            ? [["running","LØPING"],["profile","PROFIL"]]
+            ? [["running","LØPING"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
             : section === "sykkel"
-            ? [["cycling","SYKKEL"],["profile","PROFIL"]]
+            ? [["cycling","SYKKEL"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
             : section === "plan"
             ? [["plan","UKESPLAN"],["profile","PROFIL"]]
             : [["dashboard","DASHBOARD"],["log","LOGG ØKT"],["programs","PROGRAMMER"],["oversikt","OVERSIKT"],["profile","PROFIL"]]
@@ -2339,14 +2344,24 @@ export default function App() {
           {/* ── OVERSIKT ── */}
           {tab === "oversikt" && (
             <>
-              <div className="subnav">
-                <button className={`subnav-btn${subNav==="history"?" active":""}`} onClick={() => setSubNav("history")}>Historikk</button>
-                <button className={`subnav-btn${subNav==="kalender"?" active":""}`} onClick={() => setSubNav("kalender")}>Kalender</button>
-                <button className={`subnav-btn${subNav==="pr"?" active":""}`} onClick={() => setSubNav("pr")}>PR</button>
-                <button className={`subnav-btn${subNav==="stats"?" active":""}`} onClick={() => setSubNav("stats")}>Statistikk</button>
-              </div>
+              {/* Sub-nav depends on which sport section we're in */}
+              {section === "styrke" && (
+                <div className="subnav">
+                  <button className={`subnav-btn${subNav==="history"?" active":""}`} onClick={() => setSubNav("history")}>Historikk</button>
+                  <button className={`subnav-btn${subNav==="kalender"?" active":""}`} onClick={() => setSubNav("kalender")}>Kalender</button>
+                  <button className={`subnav-btn${subNav==="pr"?" active":""}`} onClick={() => setSubNav("pr")}>PR</button>
+                  <button className={`subnav-btn${subNav==="stats"?" active":""}`} onClick={() => setSubNav("stats")}>Statistikk</button>
+                </div>
+              )}
+              {(section === "løping" || section === "sykkel") && (
+                <div className="subnav">
+                  <button className={`subnav-btn${subNav==="history"?" active":""}`} onClick={() => setSubNav("history")}>Historikk</button>
+                  <button className={`subnav-btn${subNav==="kalender"?" active":""}`} onClick={() => setSubNav("kalender")}>Kalender</button>
+                </div>
+              )}
 
-              {subNav === "history" && (
+              {/* HISTORIKK – Styrke */}
+              {subNav === "history" && section === "styrke" && (
                 <>
                   {history.length === 0 ? <div className="empty">ingen økter ennå</div> : history.map(session => (
                     <div key={session.id} className="history-entry">
@@ -2376,6 +2391,44 @@ export default function App() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* HISTORIKK – Løping */}
+              {subNav === "history" && section === "løping" && (
+                <>
+                  {runs.length === 0 ? <div className="empty">ingen løpeturer ennå</div> : runs.map(run => (
+                    <div key={run.id} className="run-entry">
+                      <div>
+                        <div className="run-dist">{parseFloat(run.distance).toFixed(1)}</div>
+                        <div className="run-dist-unit">km</div>
+                      </div>
+                      <div className="run-meta">
+                        <div className="run-meta-date">{run.notes || run.type}</div>
+                        <div className="run-meta-detail">{run.date_key} · {fmtDuration(run.duration)} · {calcPace(parseFloat(run.distance), run.duration)} min/km</div>
+                      </div>
+                      <button className="btn-icon" onClick={() => deleteRun(run.id)}>🗑</button>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* HISTORIKK – Sykkel */}
+              {subNav === "history" && section === "sykkel" && (
+                <>
+                  {rides.length === 0 ? <div className="empty">ingen sykkelture ennå</div> : rides.map(ride => (
+                    <div key={ride.id} className="run-entry">
+                      <div>
+                        <div className="run-dist">{parseFloat(ride.distance).toFixed(1)}</div>
+                        <div className="run-dist-unit">km</div>
+                      </div>
+                      <div className="run-meta">
+                        <div className="run-meta-date">{ride.notes || ride.type}</div>
+                        <div className="run-meta-detail">{ride.date_key} · {fmtDuration(ride.duration)} · {calcSpeed(parseFloat(ride.distance), ride.duration)} km/t</div>
+                      </div>
+                      <button className="btn-icon" onClick={() => deleteRide(ride.id)}>🗑</button>
                     </div>
                   ))}
                 </>
