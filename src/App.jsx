@@ -297,40 +297,83 @@ const styles = `
 
 const PROGRAM_TEMPLATES = [
   {
-    name: "Push – Bryst / Skuldre / Triceps",
-    exercises: [
-      { group:"Bryst",    name:"Benkpress",             sets:"4", reps:"8",  weight:"" },
-      { group:"Bryst",    name:"Skråbenkpress (opp)",    sets:"3", reps:"10", weight:"" },
-      { group:"Bryst",    name:"Hantelflyes",             sets:"3", reps:"12", weight:"" },
-      { group:"Skuldre",  name:"Militærpress",            sets:"4", reps:"8",  weight:"" },
-      { group:"Skuldre",  name:"Sidehev",                 sets:"3", reps:"15", weight:"" },
-      { group:"Skuldre",  name:"Frontløft",               sets:"3", reps:"12", weight:"" },
-      { group:"Triceps",  name:"Triceps pushdown",        sets:"3", reps:"12", weight:"" },
-      { group:"Triceps",  name:"Skull crushers",          sets:"3", reps:"10", weight:"" },
+    category: "PUSH / PULL / LEGS",
+    programs: [
+      {
+        name: "Push – Bryst / Skuldre / Triceps",
+        exercises: [
+          { group:"Bryst",    name:"Benkpress",             sets:"4", reps:"8",  weight:"" },
+          { group:"Bryst",    name:"Skråbenkpress (opp)",    sets:"3", reps:"10", weight:"" },
+          { group:"Bryst",    name:"Hantelflyes",             sets:"3", reps:"12", weight:"" },
+          { group:"Skuldre",  name:"Militærpress",            sets:"4", reps:"8",  weight:"" },
+          { group:"Skuldre",  name:"Sidehev",                 sets:"3", reps:"15", weight:"" },
+          { group:"Skuldre",  name:"Frontløft",               sets:"3", reps:"12", weight:"" },
+          { group:"Triceps",  name:"Triceps pushdown",        sets:"3", reps:"12", weight:"" },
+          { group:"Triceps",  name:"Skull crushers",          sets:"3", reps:"10", weight:"" },
+        ],
+      },
+      {
+        name: "Pull – Rygg / Biceps",
+        exercises: [
+          { group:"Rygg",    name:"Markløft",                sets:"4", reps:"5",  weight:"" },
+          { group:"Rygg",    name:"Chins",                   sets:"4", reps:"8",  weight:"" },
+          { group:"Rygg",    name:"Sittende roing",           sets:"3", reps:"10", weight:"" },
+          { group:"Rygg",    name:"Lat-pulldown",             sets:"3", reps:"12", weight:"" },
+          { group:"Rygg",    name:"Ettarms hantelroing",      sets:"3", reps:"10", weight:"" },
+          { group:"Biceps",  name:"Stangcurl",                sets:"3", reps:"10", weight:"" },
+          { group:"Biceps",  name:"Hammercurl",               sets:"3", reps:"12", weight:"" },
+        ],
+      },
+      {
+        name: "Legs – Bein",
+        exercises: [
+          { group:"Bein", name:"Knebøy",             sets:"4", reps:"8",  weight:"" },
+          { group:"Bein", name:"Rumensk markløft",   sets:"3", reps:"10", weight:"" },
+          { group:"Bein", name:"Beinpress",          sets:"3", reps:"12", weight:"" },
+          { group:"Bein", name:"Bulgarske utfall",   sets:"3", reps:"10", weight:"" },
+          { group:"Bein", name:"Leg curl",           sets:"3", reps:"12", weight:"" },
+          { group:"Bein", name:"Leg extension",      sets:"3", reps:"12", weight:"" },
+          { group:"Bein", name:"Kalvehev",           sets:"4", reps:"15", weight:"" },
+        ],
+      },
     ],
   },
   {
-    name: "Pull – Rygg / Biceps",
-    exercises: [
-      { group:"Rygg",    name:"Markløft",                sets:"4", reps:"5",  weight:"" },
-      { group:"Rygg",    name:"Chins",                   sets:"4", reps:"8",  weight:"" },
-      { group:"Rygg",    name:"Sittende roing",           sets:"3", reps:"10", weight:"" },
-      { group:"Rygg",    name:"Lat-pulldown",             sets:"3", reps:"12", weight:"" },
-      { group:"Rygg",    name:"Ettarms hantelroing",      sets:"3", reps:"10", weight:"" },
-      { group:"Biceps",  name:"Stangcurl",                sets:"3", reps:"10", weight:"" },
-      { group:"Biceps",  name:"Hammercurl",               sets:"3", reps:"12", weight:"" },
+    category: "SKADEFOREBYGGING – LØPING",
+    programs: [
+      {
+        name: "Skadeforebygging Løping",
+        exercises: [
+          { group:"Bein",  name:"Hip thrust",          sets:"3", reps:"15", weight:"" },
+          { group:"Bein",  name:"Enbens markløft",     sets:"3", reps:"10", weight:"" },
+          { group:"Bein",  name:"Bulgarske utfall",    sets:"3", reps:"10", weight:"" },
+          { group:"Bein",  name:"Nordic curl",         sets:"3", reps:"8",  weight:"" },
+          { group:"Bein",  name:"Kalvehev",            sets:"4", reps:"20", weight:"" },
+          { group:"Bein",  name:"Glute bridge",        sets:"3", reps:"20", weight:"" },
+          { group:"Mage",  name:"Planke",              sets:"3", reps:"45", weight:"" },
+          { group:"Mage",  name:"Sidplanke",           sets:"3", reps:"30", weight:"" },
+          { group:"Mage",  name:"Bird dog",            sets:"3", reps:"12", weight:"" },
+        ],
+      },
     ],
   },
   {
-    name: "Legs – Bein",
-    exercises: [
-      { group:"Bein", name:"Knebøy",             sets:"4", reps:"8",  weight:"" },
-      { group:"Bein", name:"Rumensk markløft",   sets:"3", reps:"10", weight:"" },
-      { group:"Bein", name:"Beinpress",          sets:"3", reps:"12", weight:"" },
-      { group:"Bein", name:"Bulgarske utfall",   sets:"3", reps:"10", weight:"" },
-      { group:"Bein", name:"Leg curl",           sets:"3", reps:"12", weight:"" },
-      { group:"Bein", name:"Leg extension",      sets:"3", reps:"12", weight:"" },
-      { group:"Bein", name:"Kalvehev",           sets:"4", reps:"15", weight:"" },
+    category: "SKADEFOREBYGGING – SYKKEL",
+    programs: [
+      {
+        name: "Skadeforebygging Sykkel",
+        exercises: [
+          { group:"Bein",    name:"Hip thrust",          sets:"3", reps:"15", weight:"" },
+          { group:"Bein",    name:"Glute bridge",        sets:"3", reps:"20", weight:"" },
+          { group:"Bein",    name:"Utfall",              sets:"3", reps:"12", weight:"" },
+          { group:"Bein",    name:"Leg curl",            sets:"3", reps:"15", weight:"" },
+          { group:"Rygg",    name:"Hyperextensions",     sets:"3", reps:"15", weight:"" },
+          { group:"Rygg",    name:"Omvendte flyes",      sets:"3", reps:"15", weight:"" },
+          { group:"Mage",    name:"Planke",              sets:"3", reps:"45", weight:"" },
+          { group:"Mage",    name:"Pallof press",        sets:"3", reps:"12", weight:"" },
+          { group:"Mage",    name:"Deadbug",             sets:"3", reps:"10", weight:"" },
+        ],
+      },
     ],
   },
 ];
@@ -341,8 +384,8 @@ const EXERCISES_BY_GROUP = {
   "Skuldre": ["Militærpress","Hantelpress (sittende)","Sidehev","Frontløft","Bakover flyes","Shrugs","Arnold press"],
   "Biceps": ["Stangcurl","Hantelcurl","Hammercurl","Konsentrasjonskurl","Kabelbicepscurl","Predikerstolcurl"],
   "Triceps": ["Triceps pushdown","Skulderpress (trang grep)","Skull crushers","Triceps dips","Overhead tricepsext.","Kickbacks"],
-  "Bein": ["Knebøy","Frontknebøy","Beinpress","Utfall","Rumensk markløft","Leg curl","Leg extension","Hip thrust","Bulgarske utfall","Kalvehev"],
-  "Mage": ["Crunch","Planke","Situps","Beinheving","Russian twist","Pallof press","Ab wheel"],
+  "Bein": ["Knebøy","Frontknebøy","Beinpress","Utfall","Rumensk markløft","Leg curl","Leg extension","Hip thrust","Bulgarske utfall","Kalvehev","Glute bridge","Enbens markløft","Nordic curl"],
+  "Mage": ["Crunch","Planke","Sidplanke","Situps","Beinheving","Russian twist","Pallof press","Ab wheel","Bird dog","Deadbug"],
   "Kondisjon": ["Løping","Sykling","Roing","Hoppetau","Stairmaster","Ellipse","Svømming"],
   "Helkropp": ["Burpees","Kettlebell svings","Tyrkisk get-up","Clean & press","Thruster"],
 };
@@ -1417,10 +1460,10 @@ export default function App() {
               {progSaved && <div className="save-msg" style={{marginBottom:"16px"}}>✓ PROGRAM LAGRET</div>}
 
               {/* Maler */}
-              {!creatingProgram && (
-                <div style={{marginBottom:"28px"}}>
-                  <div className="graph-title" style={{marginBottom:"12px"}}>PUSH / PULL / LEGS — MALER</div>
-                  {PROGRAM_TEMPLATES.map(tpl => {
+              {!creatingProgram && PROGRAM_TEMPLATES.map(cat => (
+                <div key={cat.category} style={{marginBottom:"28px"}}>
+                  <div className="graph-title" style={{marginBottom:"12px"}}>{cat.category}</div>
+                  {cat.programs.map(tpl => {
                     const alreadyAdded = programs.some(p => p.name === tpl.name);
                     return (
                       <div key={tpl.name} className="program-card" style={{marginBottom:"10px"}}>
@@ -1432,7 +1475,7 @@ export default function App() {
                           {tpl.exercises.map((ex, i) => (
                             <div key={i} className="prog-ex-row">
                               <div className="prog-ex-name">{ex.name}</div>
-                              <div className="prog-ex-detail">{ex.sets}×{ex.reps}</div>
+                              <div className="prog-ex-detail">{ex.sets}×{ex.reps}{ex.name === "Planke" || ex.name === "Sidplanke" ? "s" : ""}</div>
                             </div>
                           ))}
                         </div>
@@ -1451,7 +1494,7 @@ export default function App() {
                     );
                   })}
                 </div>
-              )}
+              ))}
 
               {programs.length === 0 && !creatingProgram && (
                 <div className="empty">ingen egne programmer ennå</div>
