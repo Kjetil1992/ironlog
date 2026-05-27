@@ -456,7 +456,12 @@ function todayKey() {
   return new Date().toISOString().split("T")[0];
 }
 function totalVolume(exs) {
-  return exs.reduce((sum,e) => sum + (parseFloat(e.sets)||0)*(parseFloat(e.reps)||0)*(parseFloat(e.weight)||0), 0);
+  return exs.reduce((sum, e) => {
+    if (Array.isArray(e.sets)) {
+      return sum + e.sets.reduce((s, set) => s + (parseFloat(set.reps)||0) * (parseFloat(set.weight)||0), 0);
+    }
+    return sum + (parseFloat(e.sets)||0) * (parseFloat(e.reps)||0) * (parseFloat(e.weight)||0);
+  }, 0);
 }
 
 function ExerciseForm({ form, setForm, onAdd }) {
@@ -1023,9 +1028,15 @@ export default function App() {
   function addLogExercise() {
     const finalName = logForm.name === "__annet__" ? (logForm.customName||"").trim() : logForm.name;
     if (!finalName) return;
-    setExercises(prev => [...prev, { ...logForm, name: finalName, id: Date.now(), done: false }]);
+    const numSets = parseInt(logForm.sets) || 1;
+    const setsArr = Array.from({length: numSets}, () => ({
+      id: Date.now() + Math.random(),
+      reps: logForm.reps || "",
+      weight: logForm.weight || "",
+      done: false,
+    }));
+    setExercises(prev => [...prev, { name: finalName, group: logForm.group, id: Date.now(), sets: setsArr }]);
     setLogForm(f => ({ ...f, sets: "", reps: "", weight: "", customName: "" }));
-    startTimer();
   }
 
   async function saveSession() {
@@ -1051,7 +1062,16 @@ export default function App() {
   }
 
   function loadProgram(program) {
-    const loaded = program.exercises.map(ex => ({ ...ex, id: Date.now() + Math.random(), done: false }));
+    const loaded = program.exercises.map(ex => {
+      const numSets = parseInt(ex.sets) || 1;
+      const setsArr = Array.from({length: numSets}, () => ({
+        id: Date.now() + Math.random(),
+        reps: ex.reps || "",
+        weight: ex.weight || "",
+        done: false,
+      }));
+      return { name: ex.name, group: ex.group, id: Date.now() + Math.random(), sets: setsArr };
+    });
     setExercises(loaded);
     setLoadedProgram(program.name);
     setTab("log");
@@ -1111,10 +1131,20 @@ export default function App() {
   history.forEach(session => {
     session.exercises.forEach(ex => {
       const group = ex.group || "Annet";
-      const weight = parseFloat(ex.weight) || 0;
+      let weight, setsDisplay, repsDisplay;
+      if (Array.isArray(ex.sets)) {
+        weight = ex.sets.length > 0 ? Math.max(...ex.sets.map(s => parseFloat(s.weight)||0)) : 0;
+        setsDisplay = String(ex.sets.length);
+        const bestSet = ex.sets.reduce((b, s) => (parseFloat(s.weight)||0) >= (parseFloat(b.weight)||0) ? s : b, ex.sets[0] || {});
+        repsDisplay = bestSet?.reps || "";
+      } else {
+        weight = parseFloat(ex.weight) || 0;
+        setsDisplay = ex.sets;
+        repsDisplay = ex.reps;
+      }
       if (!prByGroup[group]) prByGroup[group] = {};
       if (!prByGroup[group][ex.name] || weight > prByGroup[group][ex.name].weight) {
-        prByGroup[group][ex.name] = { weight, sets: ex.sets, reps: ex.reps, date: session.date_key };
+        prByGroup[group][ex.name] = { weight, sets: setsDisplay, reps: repsDisplay, date: session.date_key };
       }
     });
   });
@@ -1133,11 +1163,15 @@ export default function App() {
     .filter(s => s.exercises.some(e => e.name === selectedExercise))
     .map(s => {
       const ex = s.exercises.find(e => e.name === selectedExercise);
-      return {
-        date: s.date_key.slice(5),
-        vekt: parseFloat(ex.weight) || 0,
-        volum: Math.round((parseFloat(ex.sets)||0) * (parseFloat(ex.reps)||0) * (parseFloat(ex.weight)||0)),
-      };
+      let vekt, volum;
+      if (Array.isArray(ex.sets)) {
+        vekt = ex.sets.length > 0 ? Math.max(...ex.sets.map(set => parseFloat(set.weight)||0)) : 0;
+        volum = Math.round(ex.sets.reduce((sum, set) => sum + (parseFloat(set.reps)||0) * (parseFloat(set.weight)||0), 0));
+      } else {
+        vekt = parseFloat(ex.weight) || 0;
+        volum = Math.round((parseFloat(ex.sets)||0) * (parseFloat(ex.reps)||0) * (parseFloat(ex.weight)||0));
+      }
+      return { date: s.date_key.slice(5), vekt, volum };
     });
 
   const volumeGraphData = [...history].reverse().slice(-20).map(s => ({
@@ -1457,56 +1491,122 @@ export default function App() {
               {exercises.length > 0 && (
                 <div style={{marginTop:"16px"}}>
                   {exercises.map(ex => {
-                    const markDone = () => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, done:true} : x));
-                    const markUndone = () => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, done:false} : x));
-                    const checkDone = () => {
+                    const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+                    const allDone = setsArr.length > 0 && setsArr.every(s => s.done);
+
+                    const updateSet = (setId, changes) => {
                       setExercises(prev => prev.map(x => {
                         if (x.id !== ex.id) return x;
-                        if (x.sets && x.reps && x.weight) return {...x, done:true};
-                        return x;
+                        return { ...x, sets: x.sets.map(s => s.id === setId ? {...s, ...changes} : s) };
                       }));
                     };
-                    if (ex.done) return (
-                      <div key={ex.id} className="exercise-item" style={{gridTemplateColumns:"auto 1fr auto",borderColor:"#4caf50",animation:"none"}}>
-                        <button onClick={markUndone} style={{width:"28px",height:"28px",background:"#4caf50",border:"none",color:"#000",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:"1rem",flexShrink:0}}>✓</button>
-                        <div style={{paddingLeft:"6px"}}>
-                          <div className="exercise-name">{ex.name}</div>
-                          <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"#4caf50",marginTop:"2px"}}>
-                            {ex.sets}×{ex.reps}{ex.weight ? ` · ${ex.weight} kg` : ""}
+                    const markSetDone = (setId) => {
+                      setExercises(prev => prev.map(x => {
+                        if (x.id !== ex.id) return x;
+                        return { ...x, sets: x.sets.map(s => s.id === setId ? {...s, done:true} : s) };
+                      }));
+                      startTimer();
+                    };
+                    const markSetUndone = (setId) => updateSet(setId, {done: false});
+                    const removeSet = (setId) => {
+                      setExercises(prev => prev.map(x => {
+                        if (x.id !== ex.id) return x;
+                        return { ...x, sets: x.sets.filter(s => s.id !== setId) };
+                      }));
+                    };
+                    const addSet = () => {
+                      const last = setsArr[setsArr.length - 1];
+                      setExercises(prev => prev.map(x => {
+                        if (x.id !== ex.id) return x;
+                        return { ...x, sets: [...x.sets, {id: Date.now()+Math.random(), reps: last?.reps||"", weight: last?.weight||"", done: false}] };
+                      }));
+                    };
+                    const markAllDone = () => {
+                      setExercises(prev => prev.map(x => {
+                        if (x.id !== ex.id) return x;
+                        return { ...x, sets: x.sets.map(s => ({...s, done:true})) };
+                      }));
+                    };
+                    const markAllUndone = () => {
+                      setExercises(prev => prev.map(x => {
+                        if (x.id !== ex.id) return x;
+                        return { ...x, sets: x.sets.map(s => ({...s, done:false})) };
+                      }));
+                    };
+
+                    if (allDone) {
+                      const maxWeight = Math.max(0, ...setsArr.map(s => parseFloat(s.weight)||0));
+                      return (
+                        <div key={ex.id} style={{background:"var(--surface)",border:"1px solid #4caf50",padding:"12px 14px",marginBottom:"8px",display:"flex",alignItems:"center",gap:"10px",animation:"slideIn .2s ease"}}>
+                          <button onClick={markAllUndone} style={{width:"28px",height:"28px",background:"#4caf50",border:"none",color:"#000",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:"1rem",flexShrink:0}}>✓</button>
+                          <div style={{flex:1}}>
+                            <div className="exercise-name">{ex.name}</div>
+                            <div style={{fontFamily:"'DM Mono',monospace",fontSize:".7rem",color:"#4caf50",marginTop:"2px"}}>
+                              {setsArr.length} sett ferdig{maxWeight > 0 ? ` · maks ${maxWeight} kg` : ""}
+                            </div>
                           </div>
+                          <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
                         </div>
-                        <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
-                      </div>
-                    );
+                      );
+                    }
+
+                    const allFilled = setsArr.every(s => s.reps && s.weight);
                     return (
-                    <div key={ex.id} className="exercise-item">
-                      <div className="exercise-name">{ex.name}</div>
-                      <div>
-                        <input type="number" min="1" className="exercise-inline-input" value={ex.sets||""} placeholder="–"
-                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, sets:e.target.value} : x))}
-                          onBlur={checkDone} />
-                        <div className="exercise-unit" style={{textAlign:"center"}}>sett</div>
+                      <div key={ex.id} style={{background:"var(--surface)",border:"1px solid var(--border)",marginBottom:"8px",animation:"slideIn .2s ease",overflow:"hidden"}}>
+                        {/* Card header */}
+                        <div style={{display:"flex",alignItems:"center",padding:"10px 14px",borderBottom:"1px solid var(--border)",gap:"8px"}}>
+                          <div className="exercise-name" style={{flex:1}}>{ex.name}</div>
+                          {allFilled && (
+                            <button onClick={markAllDone} style={{fontSize:".6rem",fontFamily:"'DM Mono',monospace",letterSpacing:"1px",background:"none",border:"1px solid #4caf50",color:"#4caf50",padding:"3px 10px",cursor:"pointer",whiteSpace:"nowrap"}}>ALT FERDIG ✓</button>
+                          )}
+                          <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
+                        </div>
+
+                        {/* Per-set rows */}
+                        {setsArr.map((set, setIdx) => {
+                          if (set.done) {
+                            return (
+                              <div key={set.id} style={{display:"flex",alignItems:"center",padding:"8px 14px",borderBottom:"1px solid var(--surface2)",background:"rgba(76,175,80,0.06)",gap:"10px"}}>
+                                <button onClick={() => markSetUndone(set.id)} style={{width:"22px",height:"22px",background:"#4caf50",border:"none",color:"#000",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:".75rem",fontWeight:"bold",flexShrink:0}}>✓</button>
+                                <span style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)",width:"44px",flexShrink:0}}>Sett {setIdx+1}</span>
+                                <span style={{fontFamily:"'DM Mono',monospace",fontSize:".8rem",color:"#4caf50",flex:1}}>{set.reps} reps · {set.weight} kg</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={set.id} style={{display:"grid",gridTemplateColumns:"44px 1fr 1fr auto auto",alignItems:"center",gap:"8px",padding:"8px 14px",borderBottom:"1px solid var(--surface2)"}}>
+                              <span style={{fontFamily:"'DM Mono',monospace",fontSize:".65rem",color:"var(--muted)"}}>Sett {setIdx+1}</span>
+                              <div>
+                                <input type="number" min="1" className="exercise-inline-input" value={set.reps} placeholder="reps"
+                                  onChange={e => updateSet(set.id, {reps: e.target.value})}
+                                  onKeyDown={e => e.key === "Enter" && set.reps && set.weight && markSetDone(set.id)} />
+                                <div className="exercise-unit" style={{textAlign:"center"}}>reps</div>
+                              </div>
+                              <div>
+                                <input type="number" min="0" step="0.5" className="exercise-inline-input" value={set.weight} placeholder="kg"
+                                  onChange={e => updateSet(set.id, {weight: e.target.value})}
+                                  onKeyDown={e => e.key === "Enter" && set.reps && set.weight && markSetDone(set.id)} />
+                                <div className="exercise-unit" style={{textAlign:"center"}}>kg</div>
+                              </div>
+                              <button
+                                onClick={() => set.reps && set.weight && markSetDone(set.id)}
+                                title="Sett ferdig"
+                                style={{width:"28px",height:"28px",background:"none",border:`1px solid ${set.reps&&set.weight?"#4caf50":"var(--border)"}`,color:set.reps&&set.weight?"#4caf50":"var(--muted)",cursor:set.reps&&set.weight?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:".9rem",flexShrink:0,transition:"all .15s"}}>✓</button>
+                              <button onClick={() => removeSet(set.id)} className="btn-remove" style={{width:"22px",height:"22px",flexShrink:0}}>×</button>
+                            </div>
+                          );
+                        })}
+
+                        {/* Add set footer */}
+                        <div style={{padding:"8px 14px"}}>
+                          <button onClick={addSet}
+                            style={{background:"none",border:"1px dashed var(--border)",color:"var(--muted)",fontFamily:"'DM Mono',monospace",fontSize:".6rem",letterSpacing:"1px",padding:"5px 14px",cursor:"pointer",width:"100%",transition:"all .15s"}}
+                            onMouseEnter={e => {e.currentTarget.style.borderColor="#F97316";e.currentTarget.style.color="#F97316";}}
+                            onMouseLeave={e => {e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.color="var(--muted)";}}>
+                            + LEGG TIL SETT
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <input type="number" min="1" className="exercise-inline-input" value={ex.reps||""} placeholder="–"
-                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, reps:e.target.value} : x))}
-                          onBlur={checkDone} />
-                        <div className="exercise-unit" style={{textAlign:"center"}}>reps</div>
-                      </div>
-                      <div>
-                        <input type="number" min="0" step="0.5" className="exercise-inline-input" value={ex.weight||""} placeholder="–"
-                          onChange={e => setExercises(prev => prev.map(x => x.id===ex.id ? {...x, weight:e.target.value} : x))}
-                          onBlur={checkDone} />
-                        <div className="exercise-unit" style={{textAlign:"center"}}>kg</div>
-                      </div>
-                      <div style={{display:"flex",gap:"4px",alignItems:"center"}}>
-                        {ex.sets && ex.reps && (
-                          <button onClick={markDone} title="Merk som ferdig"
-                            style={{width:"28px",height:"28px",background:"none",border:"1px solid #4caf50",color:"#4caf50",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:"bold",fontSize:".9rem",flexShrink:0}}>✓</button>
-                        )}
-                        <button className="btn-remove" onClick={() => setExercises(prev => prev.filter(e => e.id !== ex.id))}>×</button>
-                      </div>
-                    </div>
                     );
                   })}
                 </div>
@@ -2045,7 +2145,16 @@ export default function App() {
                         {session.exercises.map((ex, i) => (
                           <div key={i} className="hist-ex-row">
                             <div className="hist-ex-name">{ex.name}</div>
-                            <div className="hist-ex-sets">{ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}kg` : ""}</div>
+                            {Array.isArray(ex.sets) ? (
+                              <div className="hist-ex-sets">
+                                {ex.sets.length} sett
+                                {ex.sets.length > 0 && Math.max(...ex.sets.map(s => parseFloat(s.weight)||0)) > 0
+                                  ? ` · maks ${Math.max(...ex.sets.map(s => parseFloat(s.weight)||0))} kg`
+                                  : ""}
+                              </div>
+                            ) : (
+                              <div className="hist-ex-sets">{ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}kg` : ""}</div>
+                            )}
                           </div>
                         ))}
                       </div>
