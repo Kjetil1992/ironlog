@@ -2921,7 +2921,7 @@ export default function App() {
                               gt.id==="sykkel_km" ? "Månedlig syklingsdistanse" :
                               gt.id==="okter" ? "Ukentlige treningsøkter" :
                               gt.id==="vekt" ? "Kroppsvektmål" : "";
-                            setGoalForm(f => ({...f, type:gt.id, unit:UNIT_LABELS[gt.id]||"", title: f.title || auto}));
+                            setGoalForm(f => ({...f, type:gt.id, unit:UNIT_LABELS[gt.id]||"", title: auto}));
                           }}>
                           {gt.icon}<br />{gt.label}
                         </button>
