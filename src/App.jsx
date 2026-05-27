@@ -495,15 +495,59 @@ const PROGRAM_TEMPLATES = [
 ];
 
 const EXERCISES_BY_GROUP = {
-  "Bryst": ["Benkpress","Skråbenkpress (opp)","Skråbenkpress (ned)","Hantelbenkpress","Hantelflyes","Kabelkryss","Dips (bryst)","Push-up"],
-  "Rygg": ["Markløft","Chins","Pull-ups","Sittende roing","Stående roing","Ettarms hantelroing","Lat-pulldown","Hyperextensions","Omvendte flyes"],
-  "Skuldre": ["Militærpress","Hantelpress (sittende)","Sidehev","Frontløft","Bakover flyes","Shrugs","Arnold press"],
-  "Biceps": ["Stangcurl","Hantelcurl","Hammercurl","Konsentrasjonskurl","Kabelbicepscurl","Predikerstolcurl"],
-  "Triceps": ["Triceps pushdown","Skulderpress (trang grep)","Skull crushers","Triceps dips","Overhead tricepsext.","Kickbacks"],
-  "Bein": ["Knebøy","Frontknebøy","Beinpress","Utfall","Rumensk markløft","Leg curl","Leg extension","Hip thrust","Bulgarske utfall","Kalvehev","Glute bridge","Enbens markløft","Nordic curl"],
-  "Mage": ["Crunch","Planke","Sidplanke","Situps","Beinheving","Russian twist","Pallof press","Ab wheel","Bird dog","Deadbug"],
-  "Kondisjon": ["Løping","Sykling","Roing","Hoppetau","Stairmaster","Ellipse","Svømming"],
-  "Helkropp": ["Burpees","Kettlebell svings","Tyrkisk get-up","Clean & press","Thruster"],
+  "Bryst": [
+    "Benkpress","Skråbenkpress (opp)","Skråbenkpress (ned)",
+    "Hantelbenkpress","Hantelbenkpress (skrå opp)","Hantelbenkpress (skrå ned)",
+    "Hantelflyes","Kabelflyes","Kabelflyes (opp)","Kabelflyes (ned)",
+    "Kabelkryss","Pec deck","Dips (bryst)","Push-up","Push-up (smal)",
+    "Smith machine benkpress","Gulvpress",
+  ],
+  "Rygg": [
+    "Markløft","Sumo markløft","Rack pull","Stiff-leg markløft",
+    "Chins","Pull-ups","Lat-pulldown","Lat-pulldown (nøytralt grep)",
+    "Sittende roing","Sittende kabeltrekk","T-bar roing","Stående roing",
+    "Ettarms hantelroing","Ettarms kabeltrekk","Hyperextensions",
+    "Omvendte flyes","Face pulls","Supermann","Rygghev",
+  ],
+  "Skuldre": [
+    "Militærpress","Push press","Hantelpress (sittende)","Arnold press",
+    "Landmine press","Sidehev","Kabel sidehev","Frontløft","Upright row",
+    "Bakover flyes","Kabel bakover flyes","Face pulls","Shrugs","Hanteltrekk",
+  ],
+  "Biceps": [
+    "Stangcurl","EZ-bar curl","Hantelcurl","Hammercurl",
+    "Konsentrasjonskurl","Kabelbicepscurl","Predikerstolcurl",
+    "Incline hantelcurl","Spider curl","Reverse curl","Zottman curl","Barbell 21s",
+  ],
+  "Triceps": [
+    "Triceps pushdown","Rope pushdown","Ettarms pushdown","Reverse pushdown",
+    "Skull crushers","JM press","Close grip benkpress",
+    "Overhead tricepsext.","Kabel overhead ext.","Triceps dips","Kickbacks",
+  ],
+  "Bein": [
+    "Knebøy","Frontknebøy","Sumo knebøy","Goblet squat","Hack squat",
+    "Beinpress","Smal beinpress","Leg extension","Leg curl","Seated leg curl",
+    "Utfall","Bulgarske utfall","Steg-ups","Pistol squat",
+    "Rumensk markløft","Enbens markløft","Nordic curl","Glute-ham raise",
+    "Hip thrust","Glute bridge","Kickbacks (kabel)","Abduktor","Adduktor",
+    "Kalvehev","Seated kalvehev",
+  ],
+  "Mage": [
+    "Crunch","Crunch (kabel)","Situps","Reverse crunch","V-ups",
+    "Planke","Sidplanke","Hul kropp (hollow body)","L-sit",
+    "Beinheving","Toes to bar","Hanging knee raise",
+    "Russian twist","Ab wheel","Dragon flag",
+    "Pallof press","Bird dog","Deadbug","McGill curl-up",
+  ],
+  "Kondisjon": [
+    "Løping","Sykling","Roing","Hoppetau","Stairmaster",
+    "Ellipse","Svømming","Assault bike","Ski erg","Battle ropes",
+  ],
+  "Helkropp": [
+    "Burpees","Kettlebell svings","Tyrkisk get-up","Clean & press","Thruster",
+    "Farmers walk","Sandbag carry","Box jumps","Wall ball",
+    "Sled push","Bear crawl","Man maker","Snatch","Clean","Jerk",
+  ],
 };
 
 const EMPTY_FORM = { name: "Benkpress", sets: "", reps: "", weight: "", group: "Bryst", customName: "" };
